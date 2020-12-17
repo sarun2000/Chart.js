@@ -3,7 +3,7 @@
 
 <head>
 	<title>Stacked Bar Chart</title>
-	<script src="../../../dist/Chart.min.js"></script>
+	<script src="../../../dist/chart.min.js"></script>
 	<script src="../../utils.js"></script>
 	<style>
 	canvas {
@@ -67,22 +67,24 @@
 				type: 'bar',
 				data: barChartData,
 				options: {
-					title: {
-						display: true,
-						text: 'Chart.js Bar Chart - Stacked'
-					},
-					tooltips: {
-						mode: 'index',
-						intersect: false
+					plugins: {
+						title: {
+							display: true,
+							text: 'Chart.js Bar Chart - Stacked'
+						},
+						tooltip: {
+							mode: 'index',
+							intersect: false
+						},
 					},
 					responsive: true,
 					scales: {
-						xAxes: [{
+						x: {
 							stacked: true,
-						}],
-						yAxes: [{
+						},
+						y: {
 							stacked: true
-						}]
+						}
 					}
 				}
 			});

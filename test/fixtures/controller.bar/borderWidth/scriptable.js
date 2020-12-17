@@ -19,10 +19,8 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
-				rectangle: {
+				bar: {
 					backgroundColor: 'transparent',
 					borderColor: '#888',
 					borderWidth: function(ctx) {
@@ -31,15 +29,11 @@ module.exports = {
 				}
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [
-					{
-						display: false,
-						ticks: {
-							beginAtZero: true
-						}
-					}
-				]
+				x: {display: false},
+				y: {
+					display: false,
+					beginAtZero: true
+				}
 			}
 		}
 	},

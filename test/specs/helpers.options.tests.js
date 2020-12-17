@@ -1,11 +1,7 @@
-'use strict';
+const {toLineHeight, toPadding, toFont, resolve, toTRBLCorners} = Chart.helpers;
 
 describe('Chart.helpers.options', function() {
-	var options = Chart.helpers.options;
-
 	describe('toLineHeight', function() {
-		var toLineHeight = options.toLineHeight;
-
 		it ('should support keyword values', function() {
 			expect(toLineHeight('normal', 16)).toBe(16 * 1.2);
 		});
@@ -27,9 +23,44 @@ describe('Chart.helpers.options', function() {
 		});
 	});
 
-	describe('toPadding', function() {
-		var toPadding = options.toPadding;
+	describe('toTRBLCorners', function() {
+		it('should support number values', function() {
+			expect(toTRBLCorners(4)).toEqual(
+				{topLeft: 4, topRight: 4, bottomLeft: 4, bottomRight: 4});
+			expect(toTRBLCorners(4.5)).toEqual(
+				{topLeft: 4.5, topRight: 4.5, bottomLeft: 4.5, bottomRight: 4.5});
+		});
+		it('should support string values', function() {
+			expect(toTRBLCorners('4')).toEqual(
+				{topLeft: 4, topRight: 4, bottomLeft: 4, bottomRight: 4});
+			expect(toTRBLCorners('4.5')).toEqual(
+				{topLeft: 4.5, topRight: 4.5, bottomLeft: 4.5, bottomRight: 4.5});
+		});
+		it('should support object values', function() {
+			expect(toTRBLCorners({topLeft: 1, topRight: 2, bottomLeft: 3, bottomRight: 4})).toEqual(
+				{topLeft: 1, topRight: 2, bottomLeft: 3, bottomRight: 4});
+			expect(toTRBLCorners({topLeft: 1.5, topRight: 2.5, bottomLeft: 3.5, bottomRight: 4.5})).toEqual(
+				{topLeft: 1.5, topRight: 2.5, bottomLeft: 3.5, bottomRight: 4.5});
+			expect(toTRBLCorners({topLeft: '1', topRight: '2', bottomLeft: '3', bottomRight: '4'})).toEqual(
+				{topLeft: 1, topRight: 2, bottomLeft: 3, bottomRight: 4});
+		});
+		it('should fallback to 0 for invalid values', function() {
+			expect(toTRBLCorners({topLeft: 'foo', topRight: 'foo', bottomLeft: 'foo', bottomRight: 'foo'})).toEqual(
+				{topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0});
+			expect(toTRBLCorners({topLeft: null, topRight: null, bottomLeft: null, bottomRight: null})).toEqual(
+				{topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0});
+			expect(toTRBLCorners({})).toEqual(
+				{topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0});
+			expect(toTRBLCorners('foo')).toEqual(
+				{topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0});
+			expect(toTRBLCorners(null)).toEqual(
+				{topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0});
+			expect(toTRBLCorners(undefined)).toEqual(
+				{topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0});
+		});
+	});
 
+	describe('toPadding', function() {
 		it ('should support number values', function() {
 			expect(toPadding(4)).toEqual(
 				{top: 4, right: 4, bottom: 4, left: 4, height: 8, width: 8});
@@ -66,20 +97,18 @@ describe('Chart.helpers.options', function() {
 		});
 	});
 
-	describe('_parseFont', function() {
-		var parseFont = options._parseFont;
+	describe('toFont', function() {
+		it('should return a font with default values', function() {
+			const defaultFont = Object.assign({}, Chart.defaults.font);
 
-		it ('should return a font with default values', function() {
-			var global = Chart.defaults.global;
+			Object.assign(Chart.defaults.font, {
+				family: 'foobar',
+				size: 42,
+				style: 'xxxyyy',
+				lineHeight: 1.5
+			});
 
-			Chart.defaults.global = {
-				defaultFontFamily: 'foobar',
-				defaultFontSize: 42,
-				defaultFontStyle: 'xxxyyy',
-				defaultLineHeight: 1.5
-			};
-
-			expect(parseFont({})).toEqual({
+			expect(toFont({})).toEqual({
 				family: 'foobar',
 				lineHeight: 63,
 				size: 42,
@@ -88,14 +117,14 @@ describe('Chart.helpers.options', function() {
 				weight: null
 			});
 
-			Chart.defaults.global = global;
+			Object.assign(Chart.defaults.font, defaultFont);
 		});
 		it ('should return a font with given values', function() {
-			expect(parseFont({
-				fontFamily: 'bla',
+			expect(toFont({
+				family: 'bla',
 				lineHeight: 8,
-				fontSize: 21,
-				fontStyle: 'zzz'
+				size: 21,
+				style: 'zzz'
 			})).toEqual({
 				family: 'bla',
 				lineHeight: 8 * 21,
@@ -105,39 +134,53 @@ describe('Chart.helpers.options', function() {
 				weight: null
 			});
 		});
-		it('should return null as a font string if fontSize or fontFamily are missing', function() {
-			var global = Chart.defaults.global;
-
-			Chart.defaults.global = {};
-
-			expect(parseFont({
-				fontStyle: 'italic',
-				fontSize: 12
-			}).string).toBeNull();
-			expect(parseFont({
-				fontStyle: 'italic',
-				fontFamily: 'serif'
-			}).string).toBeNull();
-
-			Chart.defaults.global = global;
+		it ('should handle a string font size', function() {
+			expect(toFont({
+				family: 'bla',
+				lineHeight: 8,
+				size: '21',
+				style: 'zzz'
+			})).toEqual({
+				family: 'bla',
+				lineHeight: 8 * 21,
+				size: 21,
+				string: 'zzz 21px bla',
+				style: 'zzz',
+				weight: null
+			});
 		});
-		it('fontStyle should be optional for font strings', function() {
-			var global = Chart.defaults.global;
+		it('should return null as a font string if size or family are missing', function() {
+			const fontFamily = Chart.defaults.font.family;
+			const fontSize = Chart.defaults.font.size;
+			delete Chart.defaults.font.family;
+			delete Chart.defaults.font.size;
 
-			Chart.defaults.global = {};
+			expect(toFont({
+				style: 'italic',
+				size: 12
+			}).string).toBeNull();
+			expect(toFont({
+				style: 'italic',
+				family: 'serif'
+			}).string).toBeNull();
 
-			expect(parseFont({
-				fontSize: 12,
-				fontFamily: 'serif'
+			Chart.defaults.font.family = fontFamily;
+			Chart.defaults.font.size = fontSize;
+		});
+		it('font.style should be optional for font strings', function() {
+			const fontStyle = Chart.defaults.font.style;
+			delete Chart.defaults.font.style;
+
+			expect(toFont({
+				size: 12,
+				family: 'serif'
 			}).string).toBe('12px serif');
 
-			Chart.defaults.global = global;
+			Chart.defaults.font.style = fontStyle;
 		});
 	});
 
 	describe('resolve', function() {
-		var resolve = options.resolve;
-
 		it ('should fallback to the first defined input', function() {
 			expect(resolve([42])).toBe(42);
 			expect(resolve([42, 'foo'])).toBe(42);
@@ -158,9 +201,14 @@ describe('Chart.helpers.options', function() {
 		});
 		it ('should fallback if an indexable option value is undefined', function() {
 			var input = [42, undefined, 'bar'];
-			expect(resolve([input], undefined, 5)).toBe(undefined);
+			expect(resolve([input], undefined, 1)).toBe(undefined);
 			expect(resolve([input, 'foo'], undefined, 1)).toBe('foo');
-			expect(resolve([input, 'foo'], undefined, 5)).toBe('foo');
+		});
+		it ('should loop if an indexable option index is out of bounds', function() {
+			var input = [42, undefined, 'bar'];
+			expect(resolve([input], undefined, 3)).toBe(42);
+			expect(resolve([input, 'foo'], undefined, 4)).toBe('foo');
+			expect(resolve([input, 'foo'], undefined, 5)).toBe('bar');
 		});
 		it ('should not handle indexable options if index is undefined', function() {
 			var array = [42, 'foo', 'bar'];
@@ -193,7 +241,7 @@ describe('Chart.helpers.options', function() {
 			};
 			expect(resolve([input, 'foo'], {v: 42}, 0)).toBe(42);
 			expect(resolve([input, 'foo'], {v: 42}, 1)).toBe('foo');
-			expect(resolve([input, 'foo'], {v: 42}, 5)).toBe('foo');
+			expect(resolve([input, 'foo'], {v: 42}, 5)).toBe('bar');
 			expect(resolve([input, ['foo', 'bar']], {v: 42}, 1)).toBe('bar');
 		});
 	});

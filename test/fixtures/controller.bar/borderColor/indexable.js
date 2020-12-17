@@ -23,10 +23,8 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
-				rectangle: {
+				bar: {
 					backgroundColor: 'transparent',
 					borderColor: [
 						'#ff88ff',
@@ -40,8 +38,8 @@ module.exports = {
 				}
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [{display: false}]
+				x: {display: false},
+				y: {display: false}
 			}
 		}
 	},

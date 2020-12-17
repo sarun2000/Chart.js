@@ -8,7 +8,33 @@ describe('Chart', function() {
 		expect(Chart instanceof Object).toBeTruthy();
 		expect(chart.constructor).toBe(Chart);
 		expect(chart instanceof Chart).toBeTruthy();
-		expect(Chart.prototype.isPrototypeOf(chart)).toBeTruthy();
+	});
+
+	it('should throw an error if the canvas is already in use', function() {
+		var config = {
+			type: 'line',
+			data: {
+				datasets: [{
+					data: [1, 2, 3, 4]
+				}],
+				labels: ['A', 'B', 'C', 'D']
+			}
+		};
+		var chart = acquireChart(config);
+		var canvas = chart.canvas;
+
+		function createChart() {
+			return new Chart(canvas, config);
+		}
+
+		expect(createChart).toThrow(new Error(
+			'Canvas is already in use. ' +
+			'Chart with ID \'' + chart.id + '\'' +
+			' must be destroyed before the canvas can be reused.'
+		));
+
+		chart.destroy();
+		expect(createChart).not.toThrow();
 	});
 
 	describe('config initialization', function() {
@@ -63,67 +89,87 @@ describe('Chart', function() {
 			expect(chart.data.datasets[0].data).toEqual([10, 11, 12]);
 		});
 
-		it('should initialize config with default options', function() {
+		it('should initialize config with default interaction options', function() {
 			var callback = function() {};
 			var defaults = Chart.defaults;
+			var defaultMode = defaults.controllers.line.interaction.mode;
 
-			defaults.global.responsiveAnimationDuration = 42;
-			defaults.global.hover.onHover = callback;
-			defaults.line.spanGaps = true;
-			defaults.line.hover.mode = 'x-axis';
+			defaults.hover.onHover = callback;
+			defaults.controllers.line.spanGaps = true;
+			defaults.controllers.line.interaction.mode = 'test';
 
 			var chart = acquireChart({
 				type: 'line'
 			});
 
 			var options = chart.options;
-			expect(options.defaultFontSize).toBe(defaults.global.defaultFontSize);
-			expect(options.showLines).toBe(defaults.line.showLines);
+			expect(options.font.size).toBe(defaults.font.size);
+			expect(options.showLine).toBe(defaults.controllers.line.showLine);
 			expect(options.spanGaps).toBe(true);
-			expect(options.responsiveAnimationDuration).toBe(42);
 			expect(options.hover.onHover).toBe(callback);
-			expect(options.hover.mode).toBe('x-axis');
+			expect(options.hover.mode).toBe('test');
 
-			defaults.global.responsiveAnimationDuration = 0;
-			defaults.global.hover.onHover = null;
-			defaults.line.spanGaps = false;
-			defaults.line.hover.mode = 'label';
+			defaults.hover.onHover = null;
+			defaults.controllers.line.spanGaps = false;
+			defaults.controllers.line.interaction.mode = defaultMode;
+		});
+
+		it('should initialize config with default hover options', function() {
+			var callback = function() {};
+			var defaults = Chart.defaults;
+
+			defaults.hover.onHover = callback;
+			defaults.controllers.line.spanGaps = true;
+			defaults.controllers.line.hover.mode = 'test';
+
+			var chart = acquireChart({
+				type: 'line'
+			});
+
+			var options = chart.options;
+			expect(options.font.size).toBe(defaults.font.size);
+			expect(options.showLine).toBe(defaults.controllers.line.showLine);
+			expect(options.spanGaps).toBe(true);
+			expect(options.hover.onHover).toBe(callback);
+			expect(options.hover.mode).toBe('test');
+
+			defaults.hover.onHover = null;
+			defaults.controllers.line.spanGaps = false;
+			delete defaults.controllers.line.hover.mode;
 		});
 
 		it('should override default options', function() {
 			var callback = function() {};
 			var defaults = Chart.defaults;
 
-			defaults.global.responsiveAnimationDuration = 42;
-			defaults.global.hover.onHover = callback;
-			defaults.line.hover.mode = 'x-axis';
-			defaults.line.spanGaps = true;
+			defaults.hover.onHover = callback;
+			defaults.controllers.line.hover.mode = 'x-axis';
+			defaults.controllers.line.spanGaps = true;
 
 			var chart = acquireChart({
 				type: 'line',
 				options: {
-					responsiveAnimationDuration: 4242,
 					spanGaps: false,
 					hover: {
 						mode: 'dataset',
 					},
-					title: {
-						position: 'bottom'
+					plugins: {
+						title: {
+							position: 'bottom'
+						}
 					}
 				}
 			});
 
 			var options = chart.options;
-			expect(options.responsiveAnimationDuration).toBe(4242);
-			expect(options.showLines).toBe(defaults.global.showLines);
+			expect(options.showLine).toBe(defaults.showLine);
 			expect(options.spanGaps).toBe(false);
 			expect(options.hover.mode).toBe('dataset');
-			expect(options.title.position).toBe('bottom');
+			expect(options.plugins.title.position).toBe('bottom');
 
-			defaults.global.responsiveAnimationDuration = 0;
-			defaults.global.hover.onHover = null;
-			defaults.line.hover.mode = 'label';
-			defaults.line.spanGaps = false;
+			defaults.hover.onHover = null;
+			delete defaults.controllers.line.hover.mode;
+			defaults.controllers.line.spanGaps = false;
 		});
 
 		it('should override axis positions that are incorrect', function() {
@@ -131,19 +177,19 @@ describe('Chart', function() {
 				type: 'line',
 				options: {
 					scales: {
-						xAxes: [{
+						x: {
 							position: 'left',
-						}],
-						yAxes: [{
+						},
+						y: {
 							position: 'bottom'
-						}]
+						}
 					}
 				}
 			});
 
 			var scaleOptions = chart.options.scales;
-			expect(scaleOptions.xAxes[0].position).toBe('bottom');
-			expect(scaleOptions.yAxes[0].position).toBe('left');
+			expect(scaleOptions.x.position).toBe('bottom');
+			expect(scaleOptions.y.position).toBe('left');
 		});
 
 		it('should throw an error if the chart type is incorrect', function() {
@@ -159,17 +205,95 @@ describe('Chart', function() {
 					},
 					options: {
 						scales: {
-							xAxes: [{
+							x: {
+								type: 'linear',
 								position: 'left',
-							}],
-							yAxes: [{
+							},
+							y: {
+								type: 'category',
 								position: 'bottom'
-							}]
+							}
 						}
 					}
 				});
 			}
-			expect(createChart).toThrow(new Error('"area" is not a chart type.'));
+			expect(createChart).toThrow(new Error('"area" is not a registered controller.'));
+		});
+
+		describe('should disable hover', function() {
+			it('when options.hover=false', function() {
+				var chart = acquireChart({
+					type: 'line',
+					options: {
+						hover: false
+					}
+				});
+				expect(chart.options.hover).toBeFalse();
+			});
+
+			it('when options.interation=false and options.hover is not defined', function() {
+				var chart = acquireChart({
+					type: 'line',
+					options: {
+						interaction: false
+					}
+				});
+				expect(chart.options.hover).toBeFalse();
+			});
+
+			it('when options.interation=false and options.hover is defined', function() {
+				var chart = acquireChart({
+					type: 'line',
+					options: {
+						interaction: false,
+						hover: {mode: 'nearest'}
+					}
+				});
+				expect(chart.options.hover).toBeFalse();
+			});
+		});
+
+		it('should activate element on hover', function(done) {
+			var chart = acquireChart({
+				type: 'line',
+				data: {
+					labels: ['A', 'B', 'C', 'D'],
+					datasets: [{
+						data: [10, 20, 30, 100]
+					}]
+				}
+			});
+
+			var point = chart.getDatasetMeta(0).data[1];
+
+			afterEvent(chart, 'mousemove', function() {
+				expect(chart.getActiveElements()).toEqual([{datasetIndex: 0, index: 1, element: point}]);
+				done();
+			});
+			jasmine.triggerMouseEvent(chart, 'mousemove', point);
+		});
+
+		it('should not activate elements when hover is disabled', function(done) {
+			var chart = acquireChart({
+				type: 'line',
+				data: {
+					labels: ['A', 'B', 'C', 'D'],
+					datasets: [{
+						data: [10, 20, 30, 100]
+					}]
+				},
+				options: {
+					hover: false
+				}
+			});
+
+			var point = chart.getDatasetMeta(0).data[1];
+
+			afterEvent(chart, 'mousemove', function() {
+				expect(chart.getActiveElements()).toEqual([]);
+				done();
+			});
+			jasmine.triggerMouseEvent(chart, 'mousemove', point);
 		});
 	});
 
@@ -181,7 +305,7 @@ describe('Chart', function() {
 				_jasmineCheckC: 'c0'
 			});
 
-			Chart.helpers.merge(Chart.scaleService.defaults.logarithmic, {
+			Chart.helpers.merge(Chart.defaults.scales.logarithmic, {
 				_jasmineCheckB: 'b1',
 				_jasmineCheckC: 'c1',
 			});
@@ -191,8 +315,8 @@ describe('Chart', function() {
 			delete Chart.defaults.scale._jasmineCheckA;
 			delete Chart.defaults.scale._jasmineCheckB;
 			delete Chart.defaults.scale._jasmineCheckC;
-			delete Chart.scaleService.defaults.logarithmic._jasmineCheckB;
-			delete Chart.scaleService.defaults.logarithmic._jasmineCheckC;
+			delete Chart.defaults.scales.logarithmic._jasmineCheckB;
+			delete Chart.defaults.scales.logarithmic._jasmineCheckC;
 		});
 
 		it('should default to "category" for x scales and "linear" for y scales', function() {
@@ -200,22 +324,18 @@ describe('Chart', function() {
 				type: 'line',
 				options: {
 					scales: {
-						xAxes: [
-							{id: 'foo0'},
-							{id: 'foo1'}
-						],
-						yAxes: [
-							{id: 'bar0'},
-							{id: 'bar1'}
-						]
+						xFoo0: {},
+						xFoo1: {},
+						yBar0: {},
+						yBar1: {},
 					}
 				}
 			});
 
-			expect(chart.scales.foo0.type).toBe('category');
-			expect(chart.scales.foo1.type).toBe('category');
-			expect(chart.scales.bar0.type).toBe('linear');
-			expect(chart.scales.bar1.type).toBe('linear');
+			expect(chart.scales.xFoo0.type).toBe('category');
+			expect(chart.scales.xFoo1.type).toBe('category');
+			expect(chart.scales.yBar0.type).toBe('linear');
+			expect(chart.scales.yBar1.type).toBe('linear');
 		});
 
 		it('should correctly apply defaults on central scale', function() {
@@ -234,7 +354,7 @@ describe('Chart', function() {
 			// let's check a few values from the user options and defaults
 
 			expect(chart.scales.foo.type).toBe('logarithmic');
-			expect(chart.scales.foo.options).toBe(chart.options.scale);
+			expect(chart.scales.foo.options).toEqual(chart.options.scales.foo);
 			expect(chart.scales.foo.options).toEqual(
 				jasmine.objectContaining({
 					_jasmineCheckA: 'a0',
@@ -249,25 +369,23 @@ describe('Chart', function() {
 				type: 'line',
 				options: {
 					scales: {
-						xAxes: [{
-							id: 'foo',
+						x: {
 							type: 'logarithmic',
 							_jasmineCheckC: 'c2',
 							_jasmineCheckD: 'd2'
-						}],
-						yAxes: [{
-							id: 'bar',
+						},
+						y: {
 							type: 'time',
 							_jasmineCheckC: 'c2',
 							_jasmineCheckE: 'e2'
-						}]
+						}
 					}
 				}
 			});
 
-			expect(chart.scales.foo.type).toBe('logarithmic');
-			expect(chart.scales.foo.options).toBe(chart.options.scales.xAxes[0]);
-			expect(chart.scales.foo.options).toEqual(
+			expect(chart.scales.x.type).toBe('logarithmic');
+			expect(chart.scales.x.options).toBe(chart.options.scales.x);
+			expect(chart.scales.x.options).toEqual(
 				jasmine.objectContaining({
 					_jasmineCheckA: 'a0',
 					_jasmineCheckB: 'b1',
@@ -275,9 +393,9 @@ describe('Chart', function() {
 					_jasmineCheckD: 'd2'
 				}));
 
-			expect(chart.scales.bar.type).toBe('time');
-			expect(chart.scales.bar.options).toBe(chart.options.scales.yAxes[0]);
-			expect(chart.scales.bar.options).toEqual(
+			expect(chart.scales.y.type).toBe('time');
+			expect(chart.scales.y.options).toBe(chart.options.scales.y);
+			expect(chart.scales.y.options).toEqual(
 				jasmine.objectContaining({
 					_jasmineCheckA: 'a0',
 					_jasmineCheckB: 'b0',
@@ -292,42 +410,48 @@ describe('Chart', function() {
 				options: {
 					_jasmineCheck: 42,
 					scales: {
-						xAxes: [{
-							id: 'foo',
+						x: {
 							type: 'linear',
 							_jasmineCheck: 42,
-						}],
-						yAxes: [{
-							id: 'bar',
+						},
+						y: {
 							type: 'category',
 							_jasmineCheck: 42,
-						}]
+						}
 					}
 				}
 			});
 
 			expect(chart.options._jasmineCheck).toBeDefined();
-			expect(chart.scales.foo.options._jasmineCheck).toBeDefined();
-			expect(chart.scales.bar.options._jasmineCheck).toBeDefined();
+			expect(chart.scales.x.options._jasmineCheck).toBeDefined();
+			expect(chart.scales.y.options._jasmineCheck).toBeDefined();
 
-			expect(Chart.defaults.line._jasmineCheck).not.toBeDefined();
-			expect(Chart.defaults.global._jasmineCheck).not.toBeDefined();
-			expect(Chart.scaleService.defaults.linear._jasmineCheck).not.toBeDefined();
-			expect(Chart.scaleService.defaults.category._jasmineCheck).not.toBeDefined();
+			expect(Chart.defaults.controllers.line._jasmineCheck).not.toBeDefined();
+			expect(Chart.defaults._jasmineCheck).not.toBeDefined();
+			expect(Chart.defaults.scales.linear._jasmineCheck).not.toBeDefined();
+			expect(Chart.defaults.scales.category._jasmineCheck).not.toBeDefined();
 		});
 	});
 
-	describe('config.options.responsive: false', function() {
-		it('should not inject the resizer element', function() {
+	describe('Updating options', function() {
+		it('update should result to same set of options as construct', function() {
 			var chart = acquireChart({
+				type: 'line',
+				data: [],
 				options: {
+					animation: false,
+					locale: 'en-US',
 					responsive: false
 				}
 			});
-
-			var wrapper = chart.canvas.parentNode;
-			expect(wrapper.childNodes.length).toBe(1);
-			expect(wrapper.firstChild.tagName).toBe('CANVAS');
+			const options = chart.options;
+			chart.options = {
+				animation: false,
+				locale: 'en-US',
+				responsive: false
+			};
+			chart.update();
+			expect(chart.options).toEqual(jasmine.objectContaining(options));
 		});
 	});
 
@@ -374,14 +498,12 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.width = '455px';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 455, dh: 350,
 					rw: 455, rh: 350,
 				});
 
-				wrapper.style.width = '150px';
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
 						dw: 150, dh: 350,
@@ -390,6 +512,61 @@ describe('Chart', function() {
 
 					done();
 				});
+				wrapper.style.width = '150px';
+			});
+			wrapper.style.width = '455px';
+		});
+
+		it('should restore the original size when parent became invisible', function(done) {
+			var chart = acquireChart({
+				options: {
+					responsive: true,
+					maintainAspectRatio: false
+				}
+			}, {
+				canvas: {
+					style: ''
+				},
+				wrapper: {
+					style: 'width: 300px; height: 350px; position: relative'
+				}
+			});
+
+			waitForResize(chart, function() {
+				expect(chart).toBeChartOfSize({
+					dw: 300, dh: 350,
+					rw: 300, rh: 350,
+				});
+
+				var original = chart.resize;
+				chart.resize = function() {
+					fail('resize should not have been called');
+				};
+
+				var wrapper = chart.canvas.parentNode;
+				wrapper.style.display = 'none';
+
+				setTimeout(function() {
+					expect(wrapper.clientWidth).toEqual(0);
+					expect(wrapper.clientHeight).toEqual(0);
+
+					expect(chart).toBeChartOfSize({
+						dw: 300, dh: 350,
+						rw: 300, rh: 350,
+					});
+
+					chart.resize = original;
+
+					waitForResize(chart, function() {
+						expect(chart).toBeChartOfSize({
+							dw: 300, dh: 350,
+							rw: 300, rh: 350,
+						});
+
+						done();
+					});
+					wrapper.style.display = 'block';
+				}, 200);
 			});
 		});
 
@@ -414,14 +591,12 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.width = '455px';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 455, dh: 350,
 					rw: 455, rh: 350,
 				});
 
-				wrapper.style.width = '150px';
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
 						dw: 150, dh: 350,
@@ -430,7 +605,9 @@ describe('Chart', function() {
 
 					done();
 				});
+				wrapper.style.width = '150px';
 			});
+			wrapper.style.width = '455px';
 		});
 
 		it('should resize the canvas when parent height changes', function(done) {
@@ -454,14 +631,12 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.height = '455px';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 300, dh: 455,
 					rw: 300, rh: 455,
 				});
 
-				wrapper.style.height = '150px';
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
 						dw: 300, dh: 150,
@@ -470,7 +645,9 @@ describe('Chart', function() {
 
 					done();
 				});
+				wrapper.style.height = '150px';
 			});
+			wrapper.style.height = '455px';
 		});
 
 		it('should not include parent padding when resizing the canvas', function(done) {
@@ -495,8 +672,6 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.height = '355px';
-			wrapper.style.width = '455px';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 455, dh: 355,
@@ -505,6 +680,8 @@ describe('Chart', function() {
 
 				done();
 			});
+			wrapper.style.height = '355px';
+			wrapper.style.width = '455px';
 		});
 
 		it('should resize the canvas when the canvas display style changes from "none" to "block"', function(done) {
@@ -523,7 +700,6 @@ describe('Chart', function() {
 			});
 
 			var canvas = chart.canvas;
-			canvas.style.display = 'block';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 320, dh: 350,
@@ -532,6 +708,7 @@ describe('Chart', function() {
 
 				done();
 			});
+			canvas.style.display = 'block';
 		});
 
 		it('should resize the canvas when the wrapper display style changes from "none" to "block"', function(done) {
@@ -550,7 +727,6 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.display = 'block';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 460, dh: 380,
@@ -559,6 +735,41 @@ describe('Chart', function() {
 
 				done();
 			});
+			wrapper.style.display = 'block';
+		});
+
+		// https://github.com/chartjs/Chart.js/issues/5485
+		it('should resize the canvas when the devicePixelRatio changes', function(done) {
+			var chart = acquireChart({
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					devicePixelRatio: 1
+				}
+			}, {
+				canvas: {
+					style: ''
+				},
+				wrapper: {
+					style: 'width: 400px; height: 200px; position: relative'
+				}
+			});
+
+			expect(chart).toBeChartOfSize({
+				dw: 400, dh: 200,
+				rw: 400, rh: 200,
+			});
+
+			waitForResize(chart, function() {
+				expect(chart).toBeChartOfSize({
+					dw: 400, dh: 200,
+					rw: 800, rh: 400,
+				});
+
+				done();
+			});
+			chart.options.devicePixelRatio = 2;
+			chart.resize();
 		});
 
 		// https://github.com/chartjs/Chart.js/issues/3790
@@ -578,10 +789,7 @@ describe('Chart', function() {
 				dw: 0, dh: 0,
 				rw: 0, rh: 0,
 			});
-
-			wrapper.style.cssText = 'width: 455px; height: 355px';
-			wrapper.appendChild(canvas);
-			body.appendChild(wrapper);
+			expect(chart.chartArea).toBeUndefined();
 
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
@@ -589,10 +797,16 @@ describe('Chart', function() {
 					rw: 455, rh: 355,
 				});
 
+				expect(chart.chartArea).not.toBeUndefined();
+
 				body.removeChild(wrapper);
 				chart.destroy();
 				done();
 			});
+
+			wrapper.style.cssText = 'width: 455px; height: 355px';
+			wrapper.appendChild(canvas);
+			body.appendChild(wrapper);
 		});
 
 		it('should resize the canvas when attached to a different parent', function(done) {
@@ -612,27 +826,15 @@ describe('Chart', function() {
 				rw: 0, rh: 0,
 			});
 
-			wrapper.style.cssText = 'width: 455px; height: 355px';
-			wrapper.appendChild(canvas);
-			body.appendChild(wrapper);
-
 			waitForResize(chart, function() {
-				var resizer = wrapper.firstChild;
-				expect(resizer.className).toBe('chartjs-size-monitor');
-				expect(resizer.tagName).toBe('DIV');
 				expect(chart).toBeChartOfSize({
 					dw: 455, dh: 355,
 					rw: 455, rh: 355,
 				});
 
 				var target = document.createElement('div');
-				target.style.cssText = 'width: 640px; height: 480px';
-				target.appendChild(canvas);
-				body.appendChild(target);
 
 				waitForResize(chart, function() {
-					expect(target.firstChild).toBe(resizer);
-					expect(wrapper.firstChild).toBe(null);
 					expect(chart).toBeChartOfSize({
 						dw: 640, dh: 480,
 						rw: 640, rh: 480,
@@ -643,7 +845,15 @@ describe('Chart', function() {
 					chart.destroy();
 					done();
 				});
+
+				target.style.cssText = 'width: 640px; height: 480px';
+				target.appendChild(canvas);
+				body.appendChild(target);
 			});
+
+			wrapper.style.cssText = 'width: 455px; height: 355px';
+			wrapper.appendChild(canvas);
+			body.appendChild(wrapper);
 		});
 
 		// https://github.com/chartjs/Chart.js/issues/3521
@@ -669,19 +879,12 @@ describe('Chart', function() {
 
 			var wrapper = chart.canvas.parentNode;
 			var parent = wrapper.parentNode;
-			parent.removeChild(wrapper);
-			parent.appendChild(wrapper);
-			wrapper.style.height = '355px';
 
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 320, dh: 355,
 					rw: 320, rh: 355,
 				});
-
-				parent.removeChild(wrapper);
-				wrapper.style.width = '455px';
-				parent.appendChild(wrapper);
 
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
@@ -691,7 +894,15 @@ describe('Chart', function() {
 
 					done();
 				});
+
+				parent.removeChild(wrapper);
+				wrapper.style.width = '455px';
+				parent.appendChild(wrapper);
 			});
+
+			parent.removeChild(wrapper);
+			parent.appendChild(wrapper);
+			wrapper.style.height = '355px';
 		});
 
 		// https://github.com/chartjs/Chart.js/issues/4737
@@ -705,6 +916,8 @@ describe('Chart', function() {
 					style: 'width: 320px'
 				}
 			});
+
+			var wrapper = chart.canvas.parentNode;
 
 			waitForResize(chart, function() {
 				var canvas = chart.canvas;
@@ -721,15 +934,17 @@ describe('Chart', function() {
 					}
 				});
 
-				canvas.parentNode.style.width = '455px';
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
 						dw: 455, dh: 455,
 						rw: 455, rh: 455,
 					});
 
+					chart.destroy();
+					window.document.body.removeChild(wrapper);
 					done();
 				});
+				canvas.parentNode.style.width = '455px';
 			});
 		});
 	});
@@ -757,14 +972,12 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.width = '450px';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 450, dh: 225,
 					rw: 450, rh: 225,
 				});
 
-				wrapper.style.width = '150px';
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
 						dw: 150, dh: 75,
@@ -773,7 +986,9 @@ describe('Chart', function() {
 
 					done();
 				});
+				wrapper.style.width = '150px';
 			});
+			wrapper.style.width = '450px';
 		});
 
 		it('should not resize the canvas when parent height changes', function(done) {
@@ -797,14 +1012,12 @@ describe('Chart', function() {
 			});
 
 			var wrapper = chart.canvas.parentNode;
-			wrapper.style.height = '455px';
 			waitForResize(chart, function() {
 				expect(chart).toBeChartOfSize({
 					dw: 320, dh: 160,
 					rw: 320, rh: 160,
 				});
 
-				wrapper.style.height = '150px';
 				waitForResize(chart, function() {
 					expect(chart).toBeChartOfSize({
 						dw: 320, dh: 160,
@@ -813,7 +1026,9 @@ describe('Chart', function() {
 
 					done();
 				});
+				wrapper.style.height = '150px';
 			});
+			wrapper.style.height = '455px';
 		});
 	});
 
@@ -913,31 +1128,6 @@ describe('Chart', function() {
 		});
 	});
 
-	describe('controller.destroy', function() {
-		it('should remove the resizer element when responsive: true', function(done) {
-			var chart = acquireChart({
-				options: {
-					responsive: true
-				}
-			});
-
-			waitForResize(chart, function() {
-				var wrapper = chart.canvas.parentNode;
-				var resizer = wrapper.firstChild;
-				expect(wrapper.childNodes.length).toBe(2);
-				expect(resizer.className).toBe('chartjs-size-monitor');
-				expect(resizer.tagName).toBe('DIV');
-
-				chart.destroy();
-
-				expect(wrapper.childNodes.length).toBe(1);
-				expect(wrapper.firstChild.tagName).toBe('CANVAS');
-
-				done();
-			});
-		});
-	});
-
 	describe('controller.reset', function() {
 		it('should reset the chart elements', function() {
 			var chart = acquireChart({
@@ -957,18 +1147,18 @@ describe('Chart', function() {
 
 			// Verify that points are at their initial correct location,
 			// then we will reset and see that they moved
-			expect(meta.data[0]._model.y).toBeCloseToPixel(333);
-			expect(meta.data[1]._model.y).toBeCloseToPixel(183);
-			expect(meta.data[2]._model.y).toBeCloseToPixel(32);
-			expect(meta.data[3]._model.y).toBeCloseToPixel(482);
+			expect(meta.data[0].y).toBeCloseToPixel(333);
+			expect(meta.data[1].y).toBeCloseToPixel(183);
+			expect(meta.data[2].y).toBeCloseToPixel(32);
+			expect(meta.data[3].y).toBeCloseToPixel(482);
 
 			chart.reset();
 
 			// For a line chart, the animation state is the bottom
-			expect(meta.data[0]._model.y).toBeCloseToPixel(482);
-			expect(meta.data[1]._model.y).toBeCloseToPixel(482);
-			expect(meta.data[2]._model.y).toBeCloseToPixel(482);
-			expect(meta.data[3]._model.y).toBeCloseToPixel(482);
+			expect(meta.data[0].y).toBeCloseToPixel(482);
+			expect(meta.data[1].y).toBeCloseToPixel(482);
+			expect(meta.data[2].y).toBeCloseToPixel(482);
+			expect(meta.data[3].y).toBeCloseToPixel(482);
 		});
 	});
 
@@ -990,19 +1180,17 @@ describe('Chart', function() {
 			chart.options = {
 				responsive: false,
 				scales: {
-					yAxes: [{
-						ticks: {
-							min: 0,
-							max: 10
-						}
-					}]
+					y: {
+						min: 0,
+						max: 10
+					}
 				}
 			};
 			chart.update();
 
-			var yScale = chart.scales['y-axis-0'];
-			expect(yScale.options.ticks.min).toBe(0);
-			expect(yScale.options.ticks.max).toBe(10);
+			var yScale = chart.scales.y;
+			expect(yScale.options.min).toBe(0);
+			expect(yScale.options.max).toBe(10);
 		});
 
 		it ('should update scales options', function() {
@@ -1019,13 +1207,13 @@ describe('Chart', function() {
 				}
 			});
 
-			chart.options.scales.yAxes[0].ticks.min = 0;
-			chart.options.scales.yAxes[0].ticks.max = 10;
+			chart.options.scales.y.min = 0;
+			chart.options.scales.y.max = 10;
 			chart.update();
 
-			var yScale = chart.scales['y-axis-0'];
-			expect(yScale.options.ticks.min).toBe(0);
-			expect(yScale.options.ticks.max).toBe(10);
+			var yScale = chart.scales.y;
+			expect(yScale.options.min).toBe(0);
+			expect(yScale.options.max).toBe(10);
 		});
 
 		it ('should update scales options from new object', function() {
@@ -1043,20 +1231,18 @@ describe('Chart', function() {
 			});
 
 			var newScalesConfig = {
-				yAxes: [{
-					ticks: {
-						min: 0,
-						max: 10
-					}
-				}]
+				y: {
+					min: 0,
+					max: 10
+				}
 			};
 			chart.options.scales = newScalesConfig;
 
 			chart.update();
 
-			var yScale = chart.scales['y-axis-0'];
-			expect(yScale.options.ticks.min).toBe(0);
-			expect(yScale.options.ticks.max).toBe(10);
+			var yScale = chart.scales.y;
+			expect(yScale.options.min).toBe(0);
+			expect(yScale.options.max).toBe(10);
 		});
 
 		it ('should remove discarded scale', function() {
@@ -1071,24 +1257,19 @@ describe('Chart', function() {
 				options: {
 					responsive: true,
 					scales: {
-						yAxes: [{
-							id: 'yAxis0',
-							ticks: {
-								min: 0,
-								max: 10
-							}
-						}]
+						y: {
+							min: 0,
+							max: 10
+						}
 					}
 				}
 			});
 
 			var newScalesConfig = {
-				yAxes: [{
-					ticks: {
-						min: 0,
-						max: 10
-					}
-				}]
+				y: {
+					min: 0,
+					max: 10
+				}
 			};
 			chart.options.scales = newScalesConfig;
 
@@ -1096,9 +1277,9 @@ describe('Chart', function() {
 
 			var yScale = chart.scales.yAxis0;
 			expect(yScale).toBeUndefined();
-			var newyScale = chart.scales['y-axis-0'];
-			expect(newyScale.options.ticks.min).toBe(0);
-			expect(newyScale.options.ticks.max).toBe(10);
+			var newyScale = chart.scales.y;
+			expect(newyScale.options.min).toBe(0);
+			expect(newyScale.options.max).toBe(10);
 		});
 
 		it ('should update tooltip options', function() {
@@ -1119,13 +1300,13 @@ describe('Chart', function() {
 				mode: 'dataset',
 				intersect: false
 			};
-			chart.options.tooltips = newTooltipConfig;
+			chart.options.plugins.tooltip = newTooltipConfig;
 
 			chart.update();
-			expect(chart.tooltip._options).toEqual(jasmine.objectContaining(newTooltipConfig));
+			expect(chart.tooltip.options).toEqual(jasmine.objectContaining(newTooltipConfig));
 		});
 
-		it ('should reset the tooltip on update', function() {
+		it ('should update the tooltip on update', function(done) {
 			var chart = acquireChart({
 				type: 'line',
 				data: {
@@ -1147,18 +1328,21 @@ describe('Chart', function() {
 			var meta = chart.getDatasetMeta(0);
 			var point = meta.data[1];
 
+			afterEvent(chart, 'mousemove', function() {
+				// Check and see if tooltip was displayed
+				var tooltip = chart.tooltip;
+
+				expect(chart._active[0].element).toEqual(point);
+				expect(tooltip._active[0].element).toEqual(point);
+
+				// Update and confirm tooltip is updated
+				chart.update();
+				expect(chart._active[0].element).toEqual(point);
+				expect(tooltip._active[0].element).toEqual(point);
+
+				done();
+			});
 			jasmine.triggerMouseEvent(chart, 'mousemove', point);
-
-			// Check and see if tooltip was displayed
-			var tooltip = chart.tooltip;
-
-			expect(chart.lastActive).toEqual([point]);
-			expect(tooltip._lastActive).toEqual([point]);
-
-			// Update and confirm tooltip is reset
-			chart.update();
-			expect(chart.lastActive).toEqual([]);
-			expect(tooltip._lastActive).toEqual([]);
 		});
 
 		it ('should update the metadata', function() {
@@ -1173,15 +1357,16 @@ describe('Chart', function() {
 				options: {
 					responsive: true,
 					scales: {
-						xAxes: [{
+						x: {
 							type: 'category'
-						}],
-						yAxes: [{
+						},
+						y: {
+							type: 'linear',
 							scaleLabel: {
 								display: true,
 								labelString: 'Value'
 							}
-						}]
+						}
 					}
 				}
 			};
@@ -1198,43 +1383,57 @@ describe('Chart', function() {
 	});
 
 	describe('plugin.extensions', function() {
+		var hooks = {
+			install: ['install'],
+			uninstall: ['uninstall'],
+			init: [
+				'beforeInit',
+				'resize',
+				'afterInit'
+			],
+			start: ['start'],
+			stop: ['stop'],
+			update: [
+				'beforeUpdate',
+				'beforeLayout',
+				'beforeDataLimits',
+				'afterDataLimits',
+				'beforeBuildTicks',
+				'afterBuildTicks',
+				'beforeDataLimits',
+				'afterDataLimits',
+				'beforeBuildTicks',
+				'afterBuildTicks',
+				'afterLayout',
+				'beforeDatasetsUpdate',
+				'beforeDatasetUpdate',
+				'afterDatasetUpdate',
+				'afterDatasetsUpdate',
+				'afterUpdate',
+			],
+			render: [
+				'beforeRender',
+				'beforeDraw',
+				'beforeDatasetsDraw',
+				'beforeDatasetDraw',
+				'afterDatasetDraw',
+				'afterDatasetsDraw',
+				'beforeTooltipDraw',
+				'afterTooltipDraw',
+				'afterDraw',
+				'afterRender',
+			],
+			resize: [
+				'resize'
+			],
+			destroy: [
+				'destroy'
+			]
+		};
+
 		it ('should notify plugin in correct order', function(done) {
 			var plugin = this.plugin = {};
 			var sequence = [];
-			var hooks = {
-				init: [
-					'beforeInit',
-					'afterInit'
-				],
-				update: [
-					'beforeUpdate',
-					'beforeLayout',
-					'afterLayout',
-					'beforeDatasetsUpdate',
-					'beforeDatasetUpdate',
-					'afterDatasetUpdate',
-					'afterDatasetsUpdate',
-					'afterUpdate',
-				],
-				render: [
-					'beforeRender',
-					'beforeDraw',
-					'beforeDatasetsDraw',
-					'beforeDatasetDraw',
-					'afterDatasetDraw',
-					'afterDatasetsDraw',
-					'beforeTooltipDraw',
-					'afterTooltipDraw',
-					'afterDraw',
-					'afterRender',
-				],
-				resize: [
-					'resize'
-				],
-				destroy: [
-					'destroy'
-				]
-			};
 
 			Object.keys(hooks).forEach(function(group) {
 				hooks[group].forEach(function(name) {
@@ -1257,22 +1456,75 @@ describe('Chart', function() {
 				}
 			});
 
-			chart.canvas.parentNode.style.width = '400px';
 			waitForResize(chart, function() {
 				chart.destroy();
 
 				expect(sequence).toEqual([].concat(
+					hooks.install,
+					hooks.start,
 					hooks.init,
 					hooks.update,
 					hooks.render,
 					hooks.resize,
 					hooks.update,
 					hooks.render,
-					hooks.destroy
+					hooks.destroy,
+					hooks.stop,
+					hooks.uninstall
 				));
 
 				done();
 			});
+			chart.canvas.parentNode.style.width = '400px';
+		});
+
+		it ('should notify initially disabled plugin in correct order', function() {
+			var plugin = this.plugin = {id: 'plugin'};
+			var sequence = [];
+
+			Object.keys(hooks).forEach(function(group) {
+				hooks[group].forEach(function(name) {
+					plugin[name] = function() {
+						sequence.push(name);
+					};
+				});
+			});
+
+			var chart = window.acquireChart({
+				type: 'line',
+				data: {datasets: [{}]},
+				plugins: [plugin],
+				options: {
+					plugins: {
+						plugin: false
+					}
+				}
+			});
+
+			expect(sequence).toEqual([].concat(
+				hooks.install
+			));
+
+			sequence = [];
+			chart.options.plugins.plugin = true;
+			chart.update();
+
+			expect(sequence).toEqual([].concat(
+				hooks.start,
+				hooks.update,
+				hooks.render
+			));
+
+			sequence = [];
+			chart.options.plugins.plugin = false;
+			chart.update();
+
+			expect(sequence).toEqual(hooks.stop);
+
+			sequence = [];
+			chart.destroy();
+
+			expect(sequence).toEqual(hooks.uninstall);
 		});
 
 		it('should not notify before/afterDatasetDraw if dataset is hidden', function() {
@@ -1299,45 +1551,203 @@ describe('Chart', function() {
 		});
 	});
 
-	describe('controller.update', function() {
+	describe('metasets', function() {
 		beforeEach(function() {
 			this.chart = acquireChart({
-				type: 'doughnut',
-				options: {
-					animation: {
-						easing: 'linear',
-						duration: 500
-					}
+				type: 'line',
+				data: {
+					datasets: [
+						{label: '1', order: 2},
+						{label: '2', order: 1},
+						{label: '3', order: 4},
+						{label: '4', order: 3},
+					]
+				}
+			});
+		});
+		afterEach(function() {
+			const metasets = this.chart._metasets;
+			expect(metasets.length).toEqual(this.chart.data.datasets.length);
+			for (let i = 0; i < metasets.length; i++) {
+				expect(metasets[i].index).toEqual(i);
+				expect(metasets[i]._dataset).toEqual(this.chart.data.datasets[i]);
+			}
+		});
+		it('should build metasets array in order', function() {
+			const metasets = this.chart._metasets;
+			expect(metasets[0].order).toEqual(2);
+			expect(metasets[1].order).toEqual(1);
+			expect(metasets[2].order).toEqual(4);
+			expect(metasets[3].order).toEqual(3);
+		});
+		it('should build sorted metasets array in correct order', function() {
+			const metasets = this.chart._sortedMetasets;
+			expect(metasets[0].order).toEqual(1);
+			expect(metasets[1].order).toEqual(2);
+			expect(metasets[2].order).toEqual(3);
+			expect(metasets[3].order).toEqual(4);
+		});
+		it('should be moved when datasets are removed from begining', function() {
+			this.chart.data.datasets.splice(0, 2);
+			this.chart.update();
+			const metasets = this.chart._metasets;
+			expect(metasets[0].order).toEqual(4);
+			expect(metasets[1].order).toEqual(3);
+		});
+		it('should be moved when datasets are removed from middle', function() {
+			this.chart.data.datasets.splice(1, 2);
+			this.chart.update();
+			const metasets = this.chart._metasets;
+			expect(metasets[0].order).toEqual(2);
+			expect(metasets[1].order).toEqual(3);
+		});
+		it('should be moved when datasets are inserted', function() {
+			this.chart.data.datasets.splice(1, 0, {label: '1.5', order: 5});
+			this.chart.update();
+			const metasets = this.chart._metasets;
+			expect(metasets[0].order).toEqual(2);
+			expect(metasets[1].order).toEqual(5);
+			expect(metasets[2].order).toEqual(1);
+			expect(metasets[3].order).toEqual(4);
+			expect(metasets[4].order).toEqual(3);
+		});
+		it('should be replaced when dataset is replaced', function() {
+			this.chart.data.datasets.splice(1, 1, {label: '1.5', order: 5});
+			this.chart.update();
+			const metasets = this.chart._metasets;
+			expect(metasets[0].order).toEqual(2);
+			expect(metasets[1].order).toEqual(5);
+			expect(metasets[2].order).toEqual(4);
+			expect(metasets[3].order).toEqual(3);
+		});
+	});
+
+	describe('data visibility', function() {
+		it('should hide a dataset', function() {
+			var chart = acquireChart({
+				type: 'line',
+				data: {
+					datasets: [{
+						data: [0, 1, 2]
+					}],
+					labels: ['a', 'b', 'c']
 				}
 			});
 
-			this.addAnimationSpy = spyOn(Chart.animationService, 'addAnimation');
+			chart.setDatasetVisibility(0, false);
+
+			var meta = chart.getDatasetMeta(0);
+			expect(meta.hidden).toBe(true);
 		});
 
-		it('should add an animation with the default options', function() {
-			this.chart.update();
-
-			expect(this.addAnimationSpy).toHaveBeenCalledWith(
-				this.chart,
-				jasmine.objectContaining({easing: 'linear'}),
-				500,
-				undefined
-			);
-		});
-
-		it('should add an animation with the provided options', function() {
-			this.chart.update({
-				duration: 800,
-				easing: 'easeOutBounce',
-				lazy: false,
+		it('should toggle data visibility by index', function() {
+			var chart = acquireChart({
+				type: 'pie',
+				data: {
+					datasets: [{
+						data: [1, 2, 3]
+					}]
+				}
 			});
 
-			expect(this.addAnimationSpy).toHaveBeenCalledWith(
-				this.chart,
-				jasmine.objectContaining({easing: 'easeOutBounce'}),
-				800,
-				false
-			);
+			expect(chart.getDataVisibility(1)).toBe(true);
+
+			chart.toggleDataVisibility(1);
+			expect(chart.getDataVisibility(1)).toBe(false);
+
+			chart.update();
+			expect(chart.getDataVisibility(1)).toBe(false);
+		});
+	});
+
+	describe('isDatasetVisible', function() {
+		it('should return false if index is out of bounds', function() {
+			var chart = acquireChart({
+				type: 'line',
+				data: {
+					datasets: [{
+						data: [0, 1, 2]
+					}],
+					labels: ['a', 'b', 'c']
+				}
+			});
+
+			expect(chart.isDatasetVisible(1)).toBe(false);
+		});
+	});
+
+	describe('getChart', function() {
+		it('should get the chart from the canvas ID', function() {
+			var chart = acquireChart({
+				type: 'pie',
+				data: {
+					datasets: [{
+						data: [1, 2, 3]
+					}]
+				}
+			});
+			chart.canvas.id = 'myID';
+
+			expect(Chart.getChart('myID')).toBe(chart);
+		});
+
+		it('should get the chart from an HTMLCanvasElement', function() {
+			var chart = acquireChart({
+				type: 'pie',
+				data: {
+					datasets: [{
+						data: [1, 2, 3]
+					}]
+				}
+			});
+			expect(Chart.getChart(chart.canvas)).toBe(chart);
+		});
+
+		it('should get the chart from an CanvasRenderingContext2D', function() {
+			var chart = acquireChart({
+				type: 'pie',
+				data: {
+					datasets: [{
+						data: [1, 2, 3]
+					}]
+				}
+			});
+			expect(Chart.getChart(chart.ctx)).toBe(chart);
+		});
+
+		it('should return undefined when a chart is not found or bad data is provided', function() {
+			expect(Chart.getChart(1)).toBeUndefined();
+		});
+	});
+
+	describe('active elements', function() {
+		it('should set the active elements', function() {
+			var chart = acquireChart({
+				type: 'pie',
+				data: {
+					datasets: [{
+						data: [1, 2, 3],
+						borderColor: 'red',
+						hoverBorderColor: 'blue',
+					}]
+				}
+			});
+
+			const meta = chart.getDatasetMeta(0);
+			let props = meta.data[0].getProps(['borderColor']);
+			expect(props.options.borderColor).toEqual('red');
+
+			chart.setActiveElements([{
+				datasetIndex: 0,
+				index: 0,
+			}]);
+
+			props = meta.data[0].getProps(['borderColor']);
+			expect(props.options.borderColor).toEqual('blue');
+
+			const active = chart.getActiveElements();
+			expect(active.length).toEqual(1);
+			expect(active[0].element).toBe(meta.data[0]);
 		});
 	});
 });

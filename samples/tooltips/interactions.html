@@ -3,7 +3,7 @@
 
 <head>
 	<title>Tooltip Interaction Modes</title>
-	<script src="../../dist/Chart.min.js"></script>
+	<script src="../../dist/chart.min.js"></script>
 	<script src="../utils.js"></script>
 	<style>
 	canvas {
@@ -51,13 +51,15 @@
 				},
 				options: {
 					responsive: true,
-					title: {
-						display: true,
-						text: 'Mode: ' + mode + ', intersect = ' + intersect
-					},
-					tooltips: {
-						mode: mode,
-						intersect: intersect,
+					plugins: {
+						title: {
+							display: true,
+							text: 'Mode: ' + mode + ', intersect = ' + intersect
+						},
+						tooltip: {
+							mode: mode,
+							intersect: intersect,
+						}
 					},
 					hover: {
 						mode: mode,

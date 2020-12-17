@@ -1,124 +1,131 @@
-'use strict';
+import Scale from '../core/core.scale';
 
-var Scale = require('../core/core.scale');
+function findOrAddLabel(labels, raw, index) {
+	const first = labels.indexOf(raw);
+	if (first === -1) {
+		return typeof raw === 'string' ? labels.push(raw) - 1 : index;
+	}
+	const last = labels.lastIndexOf(raw);
+	return first !== last ? index : first;
+}
 
-var defaultConfig = {
-	position: 'bottom'
-};
+export default class CategoryScale extends Scale {
 
-module.exports = Scale.extend({
-	determineDataLimits: function() {
-		var me = this;
-		var labels = me._getLabels();
-		me.minIndex = 0;
-		me.maxIndex = labels.length - 1;
-		var findIndex;
+	constructor(cfg) {
+		super(cfg);
 
-		if (me.options.ticks.min !== undefined) {
-			// user specified min value
-			findIndex = labels.indexOf(me.options.ticks.min);
-			me.minIndex = findIndex !== -1 ? findIndex : me.minIndex;
-		}
+		/** @type {number} */
+		this._startValue = undefined;
+		this._valueRange = 0;
+	}
 
-		if (me.options.ticks.max !== undefined) {
-			// user specified max value
-			findIndex = labels.indexOf(me.options.ticks.max);
-			me.maxIndex = findIndex !== -1 ? findIndex : me.maxIndex;
-		}
+	parse(raw, index) {
+		const labels = this.getLabels();
+		return isFinite(index) && labels[index] === raw
+			? index : findOrAddLabel(labels, raw, index);
+	}
 
-		me.min = labels[me.minIndex];
-		me.max = labels[me.maxIndex];
-	},
+	determineDataLimits() {
+		const me = this;
+		const {minDefined, maxDefined} = me.getUserBounds();
+		let {min, max} = me.getMinMax(true);
 
-	buildTicks: function() {
-		var me = this;
-		var labels = me._getLabels();
-		// If we are viewing some subset of labels, slice the original array
-		me.ticks = (me.minIndex === 0 && me.maxIndex === labels.length - 1) ? labels : labels.slice(me.minIndex, me.maxIndex + 1);
-	},
-
-	getLabelForIndex: function(index, datasetIndex) {
-		var me = this;
-		var chart = me.chart;
-
-		if (chart.getDatasetMeta(datasetIndex).controller._getValueScaleId() === me.id) {
-			return me.getRightValue(chart.data.datasets[datasetIndex].data[index]);
-		}
-
-		return me.ticks[index - me.minIndex];
-	},
-
-	// Used to get data value locations.  Value can either be an index or a numerical value
-	getPixelForValue: function(value, index) {
-		var me = this;
-		var offset = me.options.offset;
-		// 1 is added because we need the length but we have the indexes
-		var offsetAmt = Math.max((me.maxIndex + 1 - me.minIndex - (offset ? 0 : 1)), 1);
-
-		// If value is a data object, then index is the index in the data array,
-		// not the index of the scale. We need to change that.
-		var valueCategory;
-		if (value !== undefined && value !== null) {
-			valueCategory = me.isHorizontal() ? value.x : value.y;
-		}
-		if (valueCategory !== undefined || (value !== undefined && isNaN(index))) {
-			var labels = me._getLabels();
-			value = valueCategory || value;
-			var idx = labels.indexOf(value);
-			index = idx !== -1 ? idx : index;
-		}
-
-		if (me.isHorizontal()) {
-			var valueWidth = me.width / offsetAmt;
-			var widthOffset = (valueWidth * (index - me.minIndex));
-
-			if (offset) {
-				widthOffset += (valueWidth / 2);
+		if (me.options.bounds === 'ticks') {
+			if (!minDefined) {
+				min = 0;
 			}
-
-			return me.left + widthOffset;
-		}
-		var valueHeight = me.height / offsetAmt;
-		var heightOffset = (valueHeight * (index - me.minIndex));
-
-		if (offset) {
-			heightOffset += (valueHeight / 2);
+			if (!maxDefined) {
+				max = me.getLabels().length - 1;
+			}
 		}
 
-		return me.top + heightOffset;
-	},
+		me.min = min;
+		me.max = max;
+	}
 
-	getPixelForTick: function(index) {
-		return this.getPixelForValue(this.ticks[index], index + this.minIndex, null);
-	},
+	buildTicks() {
+		const me = this;
+		const min = me.min;
+		const max = me.max;
+		const offset = me.options.offset;
+		const ticks = [];
+		let labels = me.getLabels();
 
-	getValueForPixel: function(pixel) {
-		var me = this;
-		var offset = me.options.offset;
-		var value;
-		var offsetAmt = Math.max((me._ticks.length - (offset ? 0 : 1)), 1);
-		var horz = me.isHorizontal();
-		var valueDimension = (horz ? me.width : me.height) / offsetAmt;
+		// If we are viewing some subset of labels, slice the original array
+		labels = (min === 0 && max === labels.length - 1) ? labels : labels.slice(min, max + 1);
 
-		pixel -= horz ? me.left : me.top;
+		me._valueRange = Math.max(labels.length - (offset ? 0 : 1), 1);
+		me._startValue = me.min - (offset ? 0.5 : 0);
 
-		if (offset) {
-			pixel -= (valueDimension / 2);
+		for (let value = min; value <= max; value++) {
+			ticks.push({value});
+		}
+		return ticks;
+	}
+
+	getLabelForValue(value) {
+		const me = this;
+		const labels = me.getLabels();
+
+		if (value >= 0 && value < labels.length) {
+			return labels[value];
+		}
+		return value;
+	}
+
+	/**
+	 * @protected
+	 */
+	configure() {
+		const me = this;
+
+		super.configure();
+
+		if (!me.isHorizontal()) {
+			// For backward compatibility, vertical category scale reverse is inverted.
+			me._reversePixels = !me._reversePixels;
+		}
+	}
+
+	// Used to get data value locations. Value can either be an index or a numerical value
+	getPixelForValue(value) {
+		const me = this;
+
+		if (typeof value !== 'number') {
+			value = me.parse(value);
 		}
 
-		if (pixel <= 0) {
-			value = 0;
-		} else {
-			value = Math.round(pixel / valueDimension);
+		return me.getPixelForDecimal((value - me._startValue) / me._valueRange);
+	}
+
+	// Must override base implementation because it calls getPixelForValue
+	// and category scale can have duplicate values
+	getPixelForTick(index) {
+		const me = this;
+		const ticks = me.ticks;
+		if (index < 0 || index > ticks.length - 1) {
+			return null;
 		}
+		return me.getPixelForValue(ticks[index].value);
+	}
 
-		return value + me.minIndex;
-	},
+	getValueForPixel(pixel) {
+		const me = this;
+		return Math.round(me._startValue + me.getDecimalForPixel(pixel) * me._valueRange);
+	}
 
-	getBasePixel: function() {
+	getBasePixel() {
 		return this.bottom;
 	}
-});
+}
 
-// INTERNAL: static default options, registered in src/index.js
-module.exports._defaults = defaultConfig;
+CategoryScale.id = 'category';
+
+/**
+ * @type {any}
+ */
+CategoryScale.defaults = {
+	ticks: {
+		callback: CategoryScale.prototype.getLabelForValue
+	}
+};

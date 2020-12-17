@@ -23,8 +23,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					borderColor: '#00ff00',
@@ -39,9 +37,7 @@ module.exports = {
 			},
 			scale: {
 				display: false,
-				ticks: {
-					beginAtZero: true
-				}
+				beginAtZero: true
 			}
 		}
 	},

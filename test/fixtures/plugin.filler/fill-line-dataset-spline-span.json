@@ -28,15 +28,13 @@
         "options": {
             "responsive": false,
             "spanGaps": true,
-            "legend": false,
-            "title": false,
             "scales": {
-                "xAxes": [{
+                "x": {
                     "display": false
-                }],
-                "yAxes": [{
+                },
+                "y": {
                     "display": false
-                }]
+                }
             },
             "elements": {
                 "point": {
@@ -46,6 +44,11 @@
                     "cubicInterpolationMode": "monotone",
                     "borderColor": "transparent"
                 }
+            },
+            "plugins": {
+                "legend": false,
+                "title": false,
+                "tooltip": false
             }
         }
     },

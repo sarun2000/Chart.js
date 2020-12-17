@@ -64,14 +64,10 @@
         },
         "options": {
             "responsive": false,
-            "legend": false,
-            "title": false,
             "scale": {
                 "display": false,
-                "ticks": {
-                    "min": 0,
-                    "max": 3
-                }
+                "min": 0,
+                "max": 3
             },
             "elements": {
                 "line": {

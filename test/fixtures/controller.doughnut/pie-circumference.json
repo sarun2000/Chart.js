@@ -23,10 +23,8 @@
             }]
         },
         "options": {
-            "circumference": 1,
-            "responsive": false,
-            "legend": false,
-            "title": false
+            "circumference": 57.32,
+            "responsive": false
         }
     }
 }

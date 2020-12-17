@@ -16,18 +16,16 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
-				rectangle: {
+				bar: {
 					backgroundColor: 'transparent',
 					borderColor: '#00ff00',
 					borderWidth: 8
 				}
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [{display: false}]
+				x: {display: false},
+				y: {display: false}
 			}
 		}
 	},

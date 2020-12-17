@@ -1,7 +1,7 @@
 'use strict';
 
-var pixelmatch = require('pixelmatch');
-var utils = require('./utils');
+import pixelmatch from 'pixelmatch';
+import utils from './utils';
 
 function toPercent(value) {
 	return Math.round(value * 10000) / 100;
@@ -20,9 +20,10 @@ function canvasFromImageData(data) {
 	return canvas;
 }
 
-function buildPixelMatchPreview(actual, expected, diff, threshold, tolerance, count) {
+function buildPixelMatchPreview(actual, expected, diff, threshold, tolerance, count, description) {
 	var ratio = count / (actual.width * actual.height);
 	var wrapper = document.createElement('div');
+	wrapper.appendChild(document.createTextNode(description));
 
 	wrapper.style.cssText = 'display: flex; overflow-y: auto';
 
@@ -65,6 +66,19 @@ function toBeCloseToPixel() {
 			}
 
 			return {pass: result};
+		}
+	};
+}
+
+function toBeCloseToPoint() {
+	function rnd(v) {
+		return Math.round(v * 100) / 100;
+	}
+	return {
+		compare: function(actual, expected) {
+			return {
+				pass: rnd(actual.x) === rnd(expected.x) && rnd(actual.y) === rnd(expected.y)
+			};
 		}
 	};
 }
@@ -182,7 +196,7 @@ function toEqualImageData() {
 				ratio = count / (w * h);
 
 				if ((ratio > tolerance) || debug) {
-					message = buildPixelMatchPreview(idata, expected, ddata, threshold, tolerance, count);
+					message = buildPixelMatchPreview(idata, expected, ddata, threshold, tolerance, count, opts.description);
 				}
 			} else {
 				message = 'Input value is not a valid image source.';
@@ -196,10 +210,11 @@ function toEqualImageData() {
 	};
 }
 
-module.exports = {
-	toBeCloseToPixel: toBeCloseToPixel,
-	toEqualOneOf: toEqualOneOf,
-	toBeValidChart: toBeValidChart,
-	toBeChartOfSize: toBeChartOfSize,
-	toEqualImageData: toEqualImageData
+export default {
+	toBeCloseToPixel,
+	toBeCloseToPoint,
+	toEqualOneOf,
+	toBeValidChart,
+	toBeChartOfSize,
+	toEqualImageData
 };

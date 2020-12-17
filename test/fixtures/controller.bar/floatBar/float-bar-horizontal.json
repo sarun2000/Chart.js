@@ -1,6 +1,6 @@
 {
     "config": {
-        "type": "horizontalBar",
+        "type": "bar",
         "data": {
             "labels": ["2030", "2034", "2038", "2042"],
             "datasets": [{
@@ -15,19 +15,16 @@
             }]
         },
         "options": {
-            "title": false,
-            "legend": false,
+            "indexAxis": "y",
             "scales": {
-                "xAxes": [{
+                "x": {
                     "display": false,
-                    "ticks": {
-                        "min": -8,
-                        "max": 12
-                    }
-                }],
-                "yAxes": [{
+                    "min": -8,
+                    "max": 12
+                },
+                "y": {
                     "display": false
-                }]
+                }
             }
         }
     },

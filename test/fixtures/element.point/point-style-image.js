@@ -32,8 +32,6 @@ module.exports = {
 		},
 		options: {
 			responsive: false,
-			legend: false,
-			title: false,
 			elements: {
 				point: {
 					pointStyle: imageCanvas,
@@ -44,8 +42,8 @@ module.exports = {
 				padding: 20
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [{display: false}]
+				x: {display: false},
+				y: {display: false}
 			}
 		}
 	},

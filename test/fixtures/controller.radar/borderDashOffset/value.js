@@ -18,8 +18,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					borderColor: '#00ff00',
@@ -36,9 +34,7 @@ module.exports = {
 			},
 			scale: {
 				display: false,
-				ticks: {
-					min: -1
-				}
+				min: -1
 			}
 		}
 	},

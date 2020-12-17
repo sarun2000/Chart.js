@@ -17,8 +17,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					fill: false,
@@ -32,9 +30,7 @@ module.exports = {
 			},
 			scale: {
 				display: false,
-				ticks: {
-					min: -15
-				}
+				min: -15
 			}
 		}
 	},

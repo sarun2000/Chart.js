@@ -18,14 +18,13 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					borderColor: '#00ff00',
 					borderDash: function(ctx) {
 						return ctx.datasetIndex === 0 ? [5] : [10];
-					}
+					},
+					fill: true,
 				},
 				point: {
 					radius: 10
@@ -33,9 +32,7 @@ module.exports = {
 			},
 			scale: {
 				display: false,
-				ticks: {
-					min: -15
-				}
+				min: -15
 			}
 		}
 	},

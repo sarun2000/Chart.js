@@ -25,8 +25,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					borderCapStyle: function(ctx) {
@@ -47,15 +45,11 @@ module.exports = {
 				padding: 32
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [
-					{
-						display: false,
-						ticks: {
-							beginAtZero: true
-						}
-					}
-				]
+				x: {display: false},
+				y: {
+					display: false,
+					beginAtZero: true
+				}
 			}
 		}
 	},

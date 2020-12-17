@@ -19,8 +19,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					borderColor: '#00ff00',
@@ -28,15 +26,16 @@ module.exports = {
 					cubicInterpolationMode: function(ctx) {
 						return ctx.datasetIndex === 0 ? 'monotone' : 'default';
 					},
-					fill: false
+					fill: false,
+					tension: 0.4
 				}
 			},
 			layout: {
 				padding: 32
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [{display: false}]
+				x: {display: false},
+				y: {display: false}
 			}
 		}
 	},

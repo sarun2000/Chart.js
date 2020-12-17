@@ -3,7 +3,7 @@
 
 <head>
 	<title>Line Chart Multiple Axes</title>
-	<script src="../../../dist/Chart.min.js"></script>
+	<script src="../../../dist/chart.min.js"></script>
 	<script src="../../utils.js"></script>
 	<style>
 	canvas {
@@ -36,7 +36,7 @@
 					randomScalingFactor(),
 					randomScalingFactor()
 				],
-				yAxisID: 'y-axis-1',
+				yAxisID: 'y',
 			}, {
 				label: 'My Second dataset',
 				borderColor: window.chartColors.blue,
@@ -51,39 +51,43 @@
 					randomScalingFactor(),
 					randomScalingFactor()
 				],
-				yAxisID: 'y-axis-2'
+				yAxisID: 'y1'
 			}]
 		};
 
 		window.onload = function() {
 			var ctx = document.getElementById('canvas').getContext('2d');
-			window.myLine = Chart.Line(ctx, {
+			window.myLine = new Chart(ctx, {
+				type: 'line',
 				data: lineChartData,
 				options: {
 					responsive: true,
-					hoverMode: 'index',
+					interaction: {
+						mode: 'index'
+					},
 					stacked: false,
-					title: {
-						display: true,
-						text: 'Chart.js Line Chart - Multi Axis'
+					plugins: {
+						title: {
+							display: true,
+							text: 'Chart.js Line Chart - Multi Axis'
+						}
 					},
 					scales: {
-						yAxes: [{
+						y: {
 							type: 'linear', // only linear but allow scale type registration. This allows extensions to exist solely for log scale for instance
 							display: true,
 							position: 'left',
-							id: 'y-axis-1',
-						}, {
+						},
+						y1: {
 							type: 'linear', // only linear but allow scale type registration. This allows extensions to exist solely for log scale for instance
 							display: true,
 							position: 'right',
-							id: 'y-axis-2',
 
 							// grid line settings
 							gridLines: {
 								drawOnChartArea: false, // only want the grid lines for one axis to show up
 							},
-						}],
+						},
 					}
 				}
 			});

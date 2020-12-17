@@ -1,29 +1,46 @@
-/* eslint-env es6 */
+/* eslint-disable import/no-commonjs */
 
-const commonjs = require('rollup-plugin-commonjs');
+const commonjs = require('@rollup/plugin-commonjs');
 const istanbul = require('rollup-plugin-istanbul');
-const resolve = require('rollup-plugin-node-resolve');
+const json = require('@rollup/plugin-json');
+const resolve = require('@rollup/plugin-node-resolve').default;
 const builds = require('./rollup.config');
+const yargs = require('yargs');
 
 module.exports = function(karma) {
-	const args = karma.args || {};
+	const args = yargs
+		.option('verbose', {default: false})
+		.argv;
 
-	// Use the same rollup config as our dist files: when debugging (--watch),
+	const grep = args.grep === true ? '' : args.grep;
+	const specPattern = 'test/specs/**/*' + grep + '*.js';
+
+	// Use the same rollup config as our dist files: when debugging (npm run dev),
 	// we will prefer the unminified build which is easier to browse and works
 	// better with source mapping. In other cases, pick the minified build to
 	// make sure that the minification process (terser) doesn't break anything.
-	const regex = args.watch ? /Chart\.js$/ : /Chart\.min\.js$/;
-	const build = builds.filter(v => v.output.file.match(regex))[0];
+	const regex = karma.autoWatch ? /chart\.js$/ : /chart\.min\.js$/;
+	const build = builds.filter(v => v.output.file && v.output.file.match(regex))[0];
 
-	if (args.watch) {
-		build.output.sourcemap = 'inline';
+	if (args.coverage) {
+		build.plugins = [
+			json(),
+			resolve(),
+			istanbul({exclude: ['node_modules/**/*.js', 'package.json']})
+		];
 	}
 
 	karma.set({
 		frameworks: ['jasmine'],
 		reporters: ['progress', 'kjhtml'],
-		browsers: ['chrome', 'firefox'],
-		logLevel: karma.LOG_WARN,
+		browsers: (args.browsers || 'chrome,firefox').split(','),
+		logLevel: karma.LOG_INFO,
+
+		client: {
+			jasmine: {
+				failFast: !!karma.autoWatch
+			}
+		},
 
 		// Explicitly disable hardware acceleration to make image
 		// diff more stable when ran on Travis and dev machine.
@@ -40,6 +57,12 @@ module.exports = function(karma) {
 				prefs: {
 					'layers.acceleration.disabled': true
 				}
+			},
+			safari: {
+				base: 'SafariPrivate'
+			},
+			edge: {
+				base: 'Edge'
 			}
 		},
 
@@ -48,9 +71,12 @@ module.exports = function(karma) {
 			{pattern: 'test/fixtures/**/*.json', included: false},
 			{pattern: 'test/fixtures/**/*.png', included: false},
 			'node_modules/moment/min/moment.min.js',
-			'test/index.js',
-			'src/index.js'
-		].concat(args.inputs),
+			{pattern: 'test/index.js', watched: false},
+			{pattern: 'test/BasicChartWebWorker.js', included: false},
+			{pattern: 'src/index.js', watched: false},
+			'node_modules/chartjs-adapter-moment/dist/chartjs-adapter-moment.js',
+			{pattern: specPattern}
+		],
 
 		preprocessors: {
 			'test/index.js': ['rollup'],
@@ -59,12 +85,14 @@ module.exports = function(karma) {
 
 		rollupPreprocessor: {
 			plugins: [
+				json(),
 				resolve(),
-				commonjs()
+				commonjs({exclude: ['src/**', 'test/**']}),
 			],
 			output: {
 				name: 'test',
-				format: 'umd'
+				format: 'umd',
+				sourcemap: karma.autoWatch ? 'inline' : false
 			}
 		},
 
@@ -81,28 +109,14 @@ module.exports = function(karma) {
 		browserDisconnectTolerance: 3
 	});
 
-	// https://swizec.com/blog/how-to-run-javascript-tests-in-chrome-on-travis/swizec/6647
-	if (process.env.TRAVIS) {
-		karma.customLaunchers.chrome.flags.push('--no-sandbox');
-	}
-
 	if (args.coverage) {
 		karma.reporters.push('coverage');
 		karma.coverageReporter = {
 			dir: 'coverage/',
 			reporters: [
 				{type: 'html', subdir: 'html'},
-				{type: 'lcovonly', subdir: '.'}
+				{type: 'lcovonly', subdir: (browser) => browser.toLowerCase().split(/[ /-]/)[0]}
 			]
 		};
-		[
-			karma.rollupPreprocessor,
-			karma.customPreprocessors.sources.options
-		].forEach(v => {
-			(v.plugins || (v.plugins = [])).unshift(
-				istanbul({
-					include: 'src/**/*.js'
-				}));
-		});
 	}
 };

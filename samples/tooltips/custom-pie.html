@@ -3,7 +3,7 @@
 
 <head>
 	<title>Pie Chart with Custom Tooltips</title>
-	<script src="../../dist/Chart.min.js"></script>
+	<script src="../../dist/chart.min.js"></script>
 	<script src="../utils.js"></script>
 
 	<style>
@@ -12,7 +12,7 @@
 			margin-top: 50px;
 			text-align: center;
 		}
-		#chartjs-tooltip {
+		.chartjs-tooltip {
 			opacity: 1;
 			position: absolute;
 			background: rgba(0, 0, 0, .7);
@@ -37,15 +37,26 @@
 <body>
 	<div id="canvas-holder" style="width: 300px;">
 		<canvas id="chart-area" width="300" height="300"></canvas>
-		<div id="chartjs-tooltip">
-			<table></table>
-		</div>
 	</div>
 
 	<script>
-		Chart.defaults.global.tooltips.custom = function(tooltip) {
+		var getOrCreateTooltip = function(chart) {
+			var tooltipEl = chart.canvas.parentNode.querySelector('div');
+
+			if (!tooltipEl) {
+				tooltipEl = document.createElement('div');
+				tooltipEl.classList.add('chartjs-tooltip');
+				tooltipEl.innerHTML = '<table></table>';
+				chart.canvas.parentNode.appendChild(tooltipEl);
+			}
+
+			return tooltipEl;
+		};
+
+		Chart.defaults.plugins.tooltip.custom = function(context) {
 			// Tooltip Element
-			var tooltipEl = document.getElementById('chartjs-tooltip');
+			var tooltip = context.tooltip;
+			var tooltipEl = getOrCreateTooltip(context.chart);
 
 			// Hide if no tooltip
 			if (tooltip.opacity === 0) {
@@ -91,16 +102,15 @@
 				tableRoot.innerHTML = innerHtml;
 			}
 
-			var positionY = this._chart.canvas.offsetTop;
-			var positionX = this._chart.canvas.offsetLeft;
+			var chart = context.chart;
+			var positionY = chart.canvas.offsetTop;
+			var positionX = chart.canvas.offsetLeft;
 
 			// Display, position, and set styles for font
 			tooltipEl.style.opacity = 1;
 			tooltipEl.style.left = positionX + tooltip.caretX + 'px';
 			tooltipEl.style.top = positionY + tooltip.caretY + 'px';
-			tooltipEl.style.fontFamily = tooltip._bodyFontFamily;
-			tooltipEl.style.fontSize = tooltip.bodyFontSize;
-			tooltipEl.style.fontStyle = tooltip._bodyFontStyle;
+			tooltipEl.style.font = tooltip.options.bodyFont.string;
 			tooltipEl.style.padding = tooltip.yPadding + 'px ' + tooltip.xPadding + 'px';
 		};
 
@@ -127,11 +137,9 @@
 			},
 			options: {
 				responsive: true,
-				legend: {
-					display: false
-				},
-				tooltips: {
-					enabled: false,
+				plugins: {
+					legend: false,
+					tooltip: false
 				}
 			}
 		};

@@ -27,8 +27,11 @@
         },
         "options": {
             "responsive": false,
-            "legend": false,
-            "title": false,
+            "spanGaps": false,
+            "plugins": {
+              "legend": false,
+              "title": false
+            },
             "scale": {
                 "display": false
             },

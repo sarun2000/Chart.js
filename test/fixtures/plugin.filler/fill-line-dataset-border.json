@@ -28,15 +28,13 @@
         "options": {
             "responsive": false,
             "spanGaps": false,
-            "legend": false,
-            "title": false,
             "scales": {
-                "xAxes": [{
+                "x": {
                     "display": false
-                }],
-                "yAxes": [{
+                },
+                "y": {
                     "display": false
-                }]
+                }
             },
             "elements": {
                 "point": {
@@ -47,6 +45,11 @@
 					"borderWidth": 5,
                     "tension": 0
                 }
+            },
+            "plugins": {
+                "legend": false,
+                "title": false,
+                "tooltip": false
             }
         }
     },

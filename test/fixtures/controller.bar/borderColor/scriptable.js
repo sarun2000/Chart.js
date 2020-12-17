@@ -22,10 +22,8 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
-				rectangle: {
+				bar: {
 					backgroundColor: 'transparent',
 					borderColor: function(ctx) {
 						var value = ctx.dataset.data[ctx.dataIndex] || 0;
@@ -38,15 +36,11 @@ module.exports = {
 				}
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [
-					{
-						display: false,
-						ticks: {
-							beginAtZero: true
-						}
-					}
-				]
+				x: {display: false},
+				y: {
+					display: false,
+					beginAtZero: true
+				}
 			}
 		}
 	},

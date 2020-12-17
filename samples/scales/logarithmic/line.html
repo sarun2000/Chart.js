@@ -3,7 +3,7 @@
 
 <head>
 	<title>Logarithmic Line Chart</title>
-	<script src="../../../dist/Chart.min.js"></script>
+	<script src="../../../dist/chart.min.js"></script>
 	<script src="../../utils.js"></script>
 	<style>
 	canvas {
@@ -60,18 +60,20 @@
 		},
 		options: {
 			responsive: true,
-			title: {
-				display: true,
-				text: 'Chart.js Line Chart - Logarithmic'
+			plugins: {
+				title: {
+					display: true,
+					text: 'Chart.js Line Chart - Logarithmic'
+				}
 			},
 			scales: {
-				xAxes: [{
+				x: {
 					display: true,
-				}],
-				yAxes: [{
+				},
+				y: {
 					display: true,
 					type: 'logarithmic',
-				}]
+				}
 			}
 		}
 	};

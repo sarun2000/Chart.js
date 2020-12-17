@@ -3,7 +3,7 @@
 
 <head>
 	<title>Scatter Chart</title>
-	<script src="../../../dist/Chart.min.js"></script>
+	<script src="../../../dist/chart.min.js"></script>
 	<script src="../../utils.js"></script>
 	<style>
 	canvas {
@@ -48,13 +48,16 @@
 
 		window.onload = function() {
 			var ctx = document.getElementById('canvas').getContext('2d');
-			window.myScatter = Chart.Scatter(ctx, {
+			window.myScatter = new Chart(ctx, {
+				type: 'scatter',
 				data: scatterChartData,
 				options: {
-					title: {
-						display: true,
-						text: 'Chart.js Scatter Chart'
-					},
+					plugins: {
+						title: {
+							display: true,
+							text: 'Chart.js Scatter Chart'
+						}
+					}
 				}
 			});
 		};

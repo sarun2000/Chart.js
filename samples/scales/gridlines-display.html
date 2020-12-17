@@ -3,7 +3,7 @@
 
 <head>
 	<title>Grid Lines Display Settings</title>
-	<script src="../../dist/Chart.min.js"></script>
+	<script src="../../dist/chart.min.js"></script>
 	<script src="../utils.js"></script>
 	<style>
 		canvas{
@@ -50,22 +50,24 @@
 				},
 				options: {
 					responsive: true,
-					title: {
-						display: true,
-						text: title
+					plugins: {
+						title: {
+							display: true,
+							text: title
+						}
 					},
 					scales: {
-						xAxes: [{
+						x: {
 							gridLines: gridlines
-						}],
-						yAxes: [{
+						},
+						y: {
 							gridLines: gridlines,
+							min: 0,
+							max: 100,
 							ticks: {
-								min: 0,
-								max: 100,
 								stepSize: 10
 							}
-						}]
+						}
 					}
 				}
 			};

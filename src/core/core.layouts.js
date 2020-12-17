@@ -1,79 +1,229 @@
-'use strict';
+import defaults from './core.defaults';
+import {each, isObject} from '../helpers/helpers.core';
+import {toPadding, resolve} from '../helpers/helpers.options';
 
-var defaults = require('./core.defaults');
-var helpers = require('../helpers/index');
+/**
+ * @typedef { import("./core.controller").default } Chart
+ */
+
+const STATIC_POSITIONS = ['left', 'top', 'right', 'bottom'];
 
 function filterByPosition(array, position) {
-	return helpers.where(array, function(v) {
-		return v.position === position;
-	});
+	return array.filter(v => v.pos === position);
+}
+
+function filterDynamicPositionByAxis(array, axis) {
+	return array.filter(v => STATIC_POSITIONS.indexOf(v.pos) === -1 && v.box.axis === axis);
 }
 
 function sortByWeight(array, reverse) {
-	array.forEach(function(v, i) {
-		v._tmpIndex_ = i;
-		return v;
-	});
-	array.sort(function(a, b) {
-		var v0 = reverse ? b : a;
-		var v1 = reverse ? a : b;
+	return array.sort((a, b) => {
+		const v0 = reverse ? b : a;
+		const v1 = reverse ? a : b;
 		return v0.weight === v1.weight ?
-			v0._tmpIndex_ - v1._tmpIndex_ :
+			v0.index - v1.index :
 			v0.weight - v1.weight;
-	});
-	array.forEach(function(v) {
-		delete v._tmpIndex_;
 	});
 }
 
-function findMaxPadding(boxes) {
-	var top = 0;
-	var left = 0;
-	var bottom = 0;
-	var right = 0;
-	helpers.each(boxes, function(box) {
-		if (box.getPadding) {
-			var boxPadding = box.getPadding();
-			top = Math.max(top, boxPadding.top);
-			left = Math.max(left, boxPadding.left);
-			bottom = Math.max(bottom, boxPadding.bottom);
-			right = Math.max(right, boxPadding.right);
+function wrapBoxes(boxes) {
+	const layoutBoxes = [];
+	let i, ilen, box;
+
+	for (i = 0, ilen = (boxes || []).length; i < ilen; ++i) {
+		box = boxes[i];
+		layoutBoxes.push({
+			index: i,
+			box,
+			pos: box.position,
+			horizontal: box.isHorizontal(),
+			weight: box.weight
+		});
+	}
+	return layoutBoxes;
+}
+
+function setLayoutDims(layouts, params) {
+	let i, ilen, layout;
+	for (i = 0, ilen = layouts.length; i < ilen; ++i) {
+		layout = layouts[i];
+		// store dimensions used instead of available chartArea in fitBoxes
+		if (layout.horizontal) {
+			layout.width = layout.box.fullWidth && params.availableWidth;
+			layout.height = params.hBoxMaxHeight;
+		} else {
+			layout.width = params.vBoxMaxWidth;
+			layout.height = layout.box.fullWidth && params.availableHeight;
 		}
-	});
+	}
+}
+
+function buildLayoutBoxes(boxes) {
+	const layoutBoxes = wrapBoxes(boxes);
+	const left = sortByWeight(filterByPosition(layoutBoxes, 'left'), true);
+	const right = sortByWeight(filterByPosition(layoutBoxes, 'right'));
+	const top = sortByWeight(filterByPosition(layoutBoxes, 'top'), true);
+	const bottom = sortByWeight(filterByPosition(layoutBoxes, 'bottom'));
+	const centerHorizontal = filterDynamicPositionByAxis(layoutBoxes, 'x');
+	const centerVertical = filterDynamicPositionByAxis(layoutBoxes, 'y');
+
 	return {
-		top: top,
-		left: left,
-		bottom: bottom,
-		right: right
+		leftAndTop: left.concat(top),
+		rightAndBottom: right.concat(centerVertical).concat(bottom).concat(centerHorizontal),
+		chartArea: filterByPosition(layoutBoxes, 'chartArea'),
+		vertical: left.concat(right).concat(centerVertical),
+		horizontal: top.concat(bottom).concat(centerHorizontal)
 	};
 }
 
-function addSizeByPosition(boxes, size) {
-	helpers.each(boxes, function(box) {
-		size[box.position] += box.isHorizontal() ? box.height : box.width;
-	});
+function getCombinedMax(maxPadding, chartArea, a, b) {
+	return Math.max(maxPadding[a], chartArea[a]) + Math.max(maxPadding[b], chartArea[b]);
 }
 
-defaults._set('global', {
-	layout: {
-		padding: {
-			top: 0,
-			right: 0,
-			bottom: 0,
-			left: 0
+function updateDims(chartArea, params, layout) {
+	const box = layout.box;
+	const maxPadding = chartArea.maxPadding;
+
+	if (isObject(layout.pos)) {
+		// dynamically placed boxes are not considered
+		return;
+	}
+	if (layout.size) {
+		// this layout was already counted for, lets first reduce old size
+		chartArea[layout.pos] -= layout.size;
+	}
+	layout.size = layout.horizontal ? box.height : box.width;
+	chartArea[layout.pos] += layout.size;
+
+	if (box.getPadding) {
+		const boxPadding = box.getPadding();
+		maxPadding.top = Math.max(maxPadding.top, boxPadding.top);
+		maxPadding.left = Math.max(maxPadding.left, boxPadding.left);
+		maxPadding.bottom = Math.max(maxPadding.bottom, boxPadding.bottom);
+		maxPadding.right = Math.max(maxPadding.right, boxPadding.right);
+	}
+
+	const newWidth = params.outerWidth - getCombinedMax(maxPadding, chartArea, 'left', 'right');
+	const newHeight = params.outerHeight - getCombinedMax(maxPadding, chartArea, 'top', 'bottom');
+
+	if (newWidth !== chartArea.w || newHeight !== chartArea.h) {
+		chartArea.w = newWidth;
+		chartArea.h = newHeight;
+
+		// return true if chart area changed in layout's direction
+		return layout.horizontal ? newWidth !== chartArea.w : newHeight !== chartArea.h;
+	}
+}
+
+function handleMaxPadding(chartArea) {
+	const maxPadding = chartArea.maxPadding;
+
+	function updatePos(pos) {
+		const change = Math.max(maxPadding[pos] - chartArea[pos], 0);
+		chartArea[pos] += change;
+		return change;
+	}
+	chartArea.y += updatePos('top');
+	chartArea.x += updatePos('left');
+	updatePos('right');
+	updatePos('bottom');
+}
+
+function getMargins(horizontal, chartArea) {
+	const maxPadding = chartArea.maxPadding;
+
+	function marginForPositions(positions) {
+		const margin = {left: 0, top: 0, right: 0, bottom: 0};
+		positions.forEach((pos) => {
+			margin[pos] = Math.max(chartArea[pos], maxPadding[pos]);
+		});
+		return margin;
+	}
+
+	return horizontal
+		? marginForPositions(['left', 'right'])
+		: marginForPositions(['top', 'bottom']);
+}
+
+function fitBoxes(boxes, chartArea, params) {
+	const refitBoxes = [];
+	let i, ilen, layout, box, refit, changed;
+
+	for (i = 0, ilen = boxes.length; i < ilen; ++i) {
+		layout = boxes[i];
+		box = layout.box;
+
+		box.update(
+			layout.width || chartArea.w,
+			layout.height || chartArea.h,
+			getMargins(layout.horizontal, chartArea)
+		);
+		if (updateDims(chartArea, params, layout)) {
+			changed = true;
+			if (refitBoxes.length) {
+				// Dimensions changed and there were non full width boxes before this
+				// -> we have to refit those
+				refit = true;
+			}
 		}
+		if (!box.fullWidth) { // fullWidth boxes don't need to be re-fitted in any case
+			refitBoxes.push(layout);
+		}
+	}
+
+	return refit ? fitBoxes(refitBoxes, chartArea, params) || changed : changed;
+}
+
+function placeBoxes(boxes, chartArea, params) {
+	const userPadding = params.padding;
+	let x = chartArea.x;
+	let y = chartArea.y;
+	let i, ilen, layout, box;
+
+	for (i = 0, ilen = boxes.length; i < ilen; ++i) {
+		layout = boxes[i];
+		box = layout.box;
+		if (layout.horizontal) {
+			box.left = box.fullWidth ? userPadding.left : chartArea.left;
+			box.right = box.fullWidth ? params.outerWidth - userPadding.right : chartArea.left + chartArea.w;
+			box.top = y;
+			box.bottom = y + box.height;
+			box.width = box.right - box.left;
+			y = box.bottom;
+		} else {
+			box.left = x;
+			box.right = x + box.width;
+			box.top = box.fullWidth ? userPadding.top : chartArea.top;
+			box.bottom = box.fullWidth ? params.outerHeight - userPadding.right : chartArea.top + chartArea.h;
+			box.height = box.bottom - box.top;
+			x = box.right;
+		}
+	}
+
+	chartArea.x = x;
+	chartArea.y = y;
+}
+
+defaults.set('layout', {
+	padding: {
+		top: 0,
+		right: 0,
+		bottom: 0,
+		left: 0
 	}
 });
 
 /**
- * @interface ILayoutItem
+ * @interface LayoutItem
+ * @typedef {object} LayoutItem
  * @prop {string} position - The position of the item in the chart layout. Possible values are
  * 'left', 'top', 'right', 'bottom', and 'chartArea'
  * @prop {number} weight - The weight used to sort the item. Higher weights are further away from the chart area
  * @prop {boolean} fullWidth - if true, and the item is horizontal, then push vertical boxes down
  * @prop {function} isHorizontal - returns true if the layout item is horizontal (ie. top or bottom)
  * @prop {function} update - Takes two parameters: width and height. Returns size of item
- * @prop {function} getPadding -  Returns an object with padding on the edges
+ * @prop {function} draw - Draws the element
+ * @prop {function} [getPadding] -  Returns an object with padding on the edges
  * @prop {number} width - Width of item. Must be valid after update()
  * @prop {number} height - Height of item. Must be valid after update()
  * @prop {number} left - Left edge of the item. Set by layout system and cannot be used in update
@@ -85,16 +235,15 @@ defaults._set('global', {
 // The layout service is very self explanatory.  It's responsible for the layout within a chart.
 // Scales, Legends and Plugins all rely on the layout service and can easily register to be placed anywhere they need
 // It is this service's responsibility of carrying out that layout.
-module.exports = {
-	defaults: {},
+export default {
 
 	/**
 	 * Register a box to a chart.
 	 * A box is simply a reference to an object that requires layout. eg. Scales, Legend, Title.
 	 * @param {Chart} chart - the chart to use
-	 * @param {ILayoutItem} item - the item to add to be layed out
+	 * @param {LayoutItem} item - the item to add to be laid out
 	 */
-	addBox: function(chart, item) {
+	addBox(chart, item) {
 		if (!chart.boxes) {
 			chart.boxes = [];
 		}
@@ -103,11 +252,12 @@ module.exports = {
 		item.fullWidth = item.fullWidth || false;
 		item.position = item.position || 'top';
 		item.weight = item.weight || 0;
+		// @ts-ignore
 		item._layers = item._layers || function() {
 			return [{
 				z: 0,
-				draw: function() {
-					item.draw.apply(item, arguments);
+				draw(chartArea) {
+					item.draw(chartArea);
 				}
 			}];
 		};
@@ -118,10 +268,10 @@ module.exports = {
 	/**
 	 * Remove a layoutItem from a chart
 	 * @param {Chart} chart - the chart to remove the box from
-	 * @param {ILayoutItem} layoutItem - the item to remove from the layout
+	 * @param {LayoutItem} layoutItem - the item to remove from the layout
 	 */
-	removeBox: function(chart, layoutItem) {
-		var index = chart.boxes ? chart.boxes.indexOf(layoutItem) : -1;
+	removeBox(chart, layoutItem) {
+		const index = chart.boxes ? chart.boxes.indexOf(layoutItem) : -1;
 		if (index !== -1) {
 			chart.boxes.splice(index, 1);
 		}
@@ -130,18 +280,18 @@ module.exports = {
 	/**
 	 * Sets (or updates) options on the given `item`.
 	 * @param {Chart} chart - the chart in which the item lives (or will be added to)
-	 * @param {ILayoutItem} item - the item to configure with the given options
+	 * @param {LayoutItem} item - the item to configure with the given options
 	 * @param {object} options - the new item options.
 	 */
-	configure: function(chart, item, options) {
-		var props = ['fullWidth', 'position', 'weight'];
-		var ilen = props.length;
-		var i = 0;
-		var prop;
+	configure(chart, item, options) {
+		const props = ['fullWidth', 'position', 'weight'];
+		const ilen = props.length;
+		let i = 0;
+		let prop;
 
 		for (; i < ilen; ++i) {
 			prop = props[i];
-			if (options.hasOwnProperty(prop)) {
+			if (Object.prototype.hasOwnProperty.call(options, prop)) {
 				item[prop] = options[prop];
 			}
 		}
@@ -154,33 +304,20 @@ module.exports = {
 	 * @param {number} width - the width to fit into
 	 * @param {number} height - the height to fit into
 	 */
-	update: function(chart, width, height) {
+	update(chart, width, height) {
 		if (!chart) {
 			return;
 		}
 
-		var layoutOptions = chart.options.layout || {};
-		var padding = helpers.options.toPadding(layoutOptions.padding);
-		var leftPadding = padding.left;
-		var rightPadding = padding.right;
-		var topPadding = padding.top;
-		var bottomPadding = padding.bottom;
+		const layoutOptions = chart.options.layout || {};
+		const context = {chart};
+		const padding = toPadding(resolve([layoutOptions.padding], context));
 
-		var leftBoxes = filterByPosition(chart.boxes, 'left');
-		var rightBoxes = filterByPosition(chart.boxes, 'right');
-		var topBoxes = filterByPosition(chart.boxes, 'top');
-		var bottomBoxes = filterByPosition(chart.boxes, 'bottom');
-		var chartAreaBoxes = filterByPosition(chart.boxes, 'chartArea');
-
-		// Sort boxes by weight. A higher weight is further away from the chart area
-		sortByWeight(leftBoxes, true);
-		sortByWeight(rightBoxes, false);
-		sortByWeight(topBoxes, true);
-		sortByWeight(bottomBoxes, false);
-
-		var verticalBoxes = leftBoxes.concat(rightBoxes);
-		var horizontalBoxes = topBoxes.concat(bottomBoxes);
-		var outerBoxes = verticalBoxes.concat(horizontalBoxes);
+		const availableWidth = width - padding.width;
+		const availableHeight = height - padding.height;
+		const boxes = buildLayoutBoxes(chart.boxes);
+		const verticalBoxes = boxes.vertical;
+		const horizontalBoxes = boxes.horizontal;
 
 		// Essentially we now have any number of boxes on each of the 4 sides.
 		// Our canvas looks like the following.
@@ -208,201 +345,60 @@ module.exports = {
 		// |                  B2 (Full Width)                   |
 		// |----------------------------------------------------|
 		//
-		// What we do to find the best sizing, we do the following
-		// 1. Determine the minimum size of the chart area.
-		// 2. Split the remaining width equally between each vertical axis
-		// 3. Split the remaining height equally between each horizontal axis
-		// 4. Give each layout the maximum size it can be. The layout will return it's minimum size
-		// 5. Adjust the sizes of each axis based on it's minimum reported size.
-		// 6. Refit each axis
-		// 7. Position each axis in the final location
-		// 8. Tell the chart the final location of the chart area
-		// 9. Tell any axes that overlay the chart area the positions of the chart area
 
-		// Step 1
-		var chartWidth = width - leftPadding - rightPadding;
-		var chartHeight = height - topPadding - bottomPadding;
-		var chartAreaWidth = chartWidth / 2; // min 50%
+		const params = Object.freeze({
+			outerWidth: width,
+			outerHeight: height,
+			padding,
+			availableWidth,
+			availableHeight,
+			vBoxMaxWidth: availableWidth / 2 / verticalBoxes.length,
+			hBoxMaxHeight: availableHeight / 2
+		});
+		const chartArea = Object.assign({
+			maxPadding: Object.assign({}, padding),
+			w: availableWidth,
+			h: availableHeight,
+			x: padding.left,
+			y: padding.top
+		}, padding);
 
-		// Step 2
-		var verticalBoxWidth = (width - chartAreaWidth) / verticalBoxes.length;
+		setLayoutDims(verticalBoxes.concat(horizontalBoxes), params);
 
-		// Step 3
-		// TODO re-limit horizontal axis height (this limit has affected only padding calculation since PR 1837)
-		// var horizontalBoxHeight = (height - chartAreaHeight) / horizontalBoxes.length;
+		// First fit vertical boxes
+		fitBoxes(verticalBoxes, chartArea, params);
 
-		// Step 4
-		var maxChartAreaWidth = chartWidth;
-		var maxChartAreaHeight = chartHeight;
-		var outerBoxSizes = {top: topPadding, left: leftPadding, bottom: bottomPadding, right: rightPadding};
-		var minBoxSizes = [];
-		var maxPadding;
-
-		function getMinimumBoxSize(box) {
-			var minSize;
-			var isHorizontal = box.isHorizontal();
-
-			if (isHorizontal) {
-				minSize = box.update(box.fullWidth ? chartWidth : maxChartAreaWidth, chartHeight / 2);
-				maxChartAreaHeight -= minSize.height;
-			} else {
-				minSize = box.update(verticalBoxWidth, maxChartAreaHeight);
-				maxChartAreaWidth -= minSize.width;
-			}
-
-			minBoxSizes.push({
-				horizontal: isHorizontal,
-				width: minSize.width,
-				box: box,
-			});
+		// Then fit horizontal boxes
+		if (fitBoxes(horizontalBoxes, chartArea, params)) {
+			// if the area changed, re-fit vertical boxes
+			fitBoxes(verticalBoxes, chartArea, params);
 		}
 
-		helpers.each(outerBoxes, getMinimumBoxSize);
+		handleMaxPadding(chartArea);
 
-		// If a horizontal box has padding, we move the left boxes over to avoid ugly charts (see issue #2478)
-		maxPadding = findMaxPadding(outerBoxes);
+		// Finally place the boxes to correct coordinates
+		placeBoxes(boxes.leftAndTop, chartArea, params);
 
-		// At this point, maxChartAreaHeight and maxChartAreaWidth are the size the chart area could
-		// be if the axes are drawn at their minimum sizes.
-		// Steps 5 & 6
+		// Move to opposite side of chart
+		chartArea.x += chartArea.w;
+		chartArea.y += chartArea.h;
 
-		// Function to fit a box
-		function fitBox(box) {
-			var minBoxSize = helpers.findNextWhere(minBoxSizes, function(minBox) {
-				return minBox.box === box;
-			});
+		placeBoxes(boxes.rightAndBottom, chartArea, params);
 
-			if (minBoxSize) {
-				if (minBoxSize.horizontal) {
-					var scaleMargin = {
-						left: Math.max(outerBoxSizes.left, maxPadding.left),
-						right: Math.max(outerBoxSizes.right, maxPadding.right),
-						top: 0,
-						bottom: 0
-					};
-
-					// Don't use min size here because of label rotation. When the labels are rotated, their rotation highly depends
-					// on the margin. Sometimes they need to increase in size slightly
-					box.update(box.fullWidth ? chartWidth : maxChartAreaWidth, chartHeight / 2, scaleMargin);
-				} else {
-					box.update(minBoxSize.width, maxChartAreaHeight);
-				}
-			}
-		}
-
-		// Update, and calculate the left and right margins for the horizontal boxes
-		helpers.each(verticalBoxes, fitBox);
-		addSizeByPosition(verticalBoxes, outerBoxSizes);
-
-		// Set the Left and Right margins for the horizontal boxes
-		helpers.each(horizontalBoxes, fitBox);
-		addSizeByPosition(horizontalBoxes, outerBoxSizes);
-
-		function finalFitVerticalBox(box) {
-			var minBoxSize = helpers.findNextWhere(minBoxSizes, function(minSize) {
-				return minSize.box === box;
-			});
-
-			var scaleMargin = {
-				left: 0,
-				right: 0,
-				top: outerBoxSizes.top,
-				bottom: outerBoxSizes.bottom
-			};
-
-			if (minBoxSize) {
-				box.update(minBoxSize.width, maxChartAreaHeight, scaleMargin);
-			}
-		}
-
-		// Let the left layout know the final margin
-		helpers.each(verticalBoxes, finalFitVerticalBox);
-
-		// Recalculate because the size of each layout might have changed slightly due to the margins (label rotation for instance)
-		outerBoxSizes = {top: topPadding, left: leftPadding, bottom: bottomPadding, right: rightPadding};
-		addSizeByPosition(outerBoxes, outerBoxSizes);
-
-		// We may be adding some padding to account for rotated x axis labels
-		var leftPaddingAddition = Math.max(maxPadding.left - outerBoxSizes.left, 0);
-		outerBoxSizes.left += leftPaddingAddition;
-		outerBoxSizes.right += Math.max(maxPadding.right - outerBoxSizes.right, 0);
-
-		var topPaddingAddition = Math.max(maxPadding.top - outerBoxSizes.top, 0);
-		outerBoxSizes.top += topPaddingAddition;
-		outerBoxSizes.bottom += Math.max(maxPadding.bottom - outerBoxSizes.bottom, 0);
-
-		// Figure out if our chart area changed. This would occur if the dataset layout label rotation
-		// changed due to the application of the margins in step 6. Since we can only get bigger, this is safe to do
-		// without calling `fit` again
-		var newMaxChartAreaHeight = height - outerBoxSizes.top - outerBoxSizes.bottom;
-		var newMaxChartAreaWidth = width - outerBoxSizes.left - outerBoxSizes.right;
-
-		if (newMaxChartAreaWidth !== maxChartAreaWidth || newMaxChartAreaHeight !== maxChartAreaHeight) {
-			helpers.each(verticalBoxes, function(box) {
-				box.height = newMaxChartAreaHeight;
-			});
-
-			helpers.each(horizontalBoxes, function(box) {
-				if (!box.fullWidth) {
-					box.width = newMaxChartAreaWidth;
-				}
-			});
-
-			maxChartAreaHeight = newMaxChartAreaHeight;
-			maxChartAreaWidth = newMaxChartAreaWidth;
-		}
-
-		// Step 7 - Position the boxes
-		var left = leftPadding + leftPaddingAddition;
-		var top = topPadding + topPaddingAddition;
-
-		function placeBox(box) {
-			if (box.isHorizontal()) {
-				box.left = box.fullWidth ? leftPadding : outerBoxSizes.left;
-				box.right = box.fullWidth ? width - rightPadding : outerBoxSizes.left + maxChartAreaWidth;
-				box.top = top;
-				box.bottom = top + box.height;
-
-				// Move to next point
-				top = box.bottom;
-
-			} else {
-
-				box.left = left;
-				box.right = left + box.width;
-				box.top = outerBoxSizes.top;
-				box.bottom = outerBoxSizes.top + maxChartAreaHeight;
-
-				// Move to next point
-				left = box.right;
-			}
-		}
-
-		helpers.each(leftBoxes.concat(topBoxes), placeBox);
-
-		// Account for chart width and height
-		left += maxChartAreaWidth;
-		top += maxChartAreaHeight;
-
-		helpers.each(rightBoxes, placeBox);
-		helpers.each(bottomBoxes, placeBox);
-
-		// Step 8
 		chart.chartArea = {
-			left: outerBoxSizes.left,
-			top: outerBoxSizes.top,
-			right: outerBoxSizes.left + maxChartAreaWidth,
-			bottom: outerBoxSizes.top + maxChartAreaHeight
+			left: chartArea.left,
+			top: chartArea.top,
+			right: chartArea.left + chartArea.w,
+			bottom: chartArea.top + chartArea.h,
+			height: chartArea.h,
+			width: chartArea.w,
 		};
 
-		// Step 9
-		helpers.each(chartAreaBoxes, function(box) {
-			box.left = chart.chartArea.left;
-			box.top = chart.chartArea.top;
-			box.right = chart.chartArea.right;
-			box.bottom = chart.chartArea.bottom;
-
-			box.update(maxChartAreaWidth, maxChartAreaHeight);
+		// Finally update boxes in chartArea (radial scale for example)
+		each(boxes.chartArea, (layout) => {
+			const box = layout.box;
+			Object.assign(box, chart.chartArea);
+			box.update(chartArea.w, chartArea.h);
 		});
 	}
 };

@@ -119,27 +119,6 @@ describe('Chart.helpers.core', function() {
 		});
 	});
 
-	describe('valueAtIndexOrDefault', function() {
-		it('should return the passed value if not an array', function() {
-			expect(helpers.valueAtIndexOrDefault(0, 0, 42)).toBe(0);
-			expect(helpers.valueAtIndexOrDefault('', 0, 42)).toBe('');
-			expect(helpers.valueAtIndexOrDefault(null, 0, 42)).toBe(null);
-			expect(helpers.valueAtIndexOrDefault(false, 0, 42)).toBe(false);
-			expect(helpers.valueAtIndexOrDefault(98, 0, 42)).toBe(98);
-		});
-		it('should return the value at index if defined', function() {
-			expect(helpers.valueAtIndexOrDefault([1, false, 'foo'], 1, 42)).toBe(false);
-			expect(helpers.valueAtIndexOrDefault([1, false, 'foo'], 2, 42)).toBe('foo');
-		});
-		it('should return the default value if the passed value is undefined', function() {
-			expect(helpers.valueAtIndexOrDefault(undefined, 0, 42)).toBe(42);
-		});
-		it('should return the default value if value at index is undefined', function() {
-			expect(helpers.valueAtIndexOrDefault([1, false, 'foo'], 3, 42)).toBe(42);
-			expect(helpers.valueAtIndexOrDefault([1, undefined, 'foo'], 1, 42)).toBe(42);
-		});
-	});
-
 	describe('callback', function() {
 		it('should return undefined if fn is not a function', function() {
 			expect(helpers.callback()).not.toBeDefined();
@@ -241,26 +220,15 @@ describe('Chart.helpers.core', function() {
 		});
 	});
 
-	describe('arrayEquals', function() {
-		it('should return false if arrays are not the same', function() {
-			expect(helpers.arrayEquals([], [42])).toBeFalsy();
-			expect(helpers.arrayEquals([42], ['42'])).toBeFalsy();
-			expect(helpers.arrayEquals([1, 2, 3], [1, 2, 3, 4])).toBeFalsy();
-			expect(helpers.arrayEquals(['foo', 'bar'], ['bar', 'foo'])).toBeFalsy();
-			expect(helpers.arrayEquals([1, 2, 3], [1, 2, 'foo'])).toBeFalsy();
-			expect(helpers.arrayEquals([1, 2, [3, 4]], [1, 2, [3, 'foo']])).toBeFalsy();
-			expect(helpers.arrayEquals([{a: 42}], [{a: 42}])).toBeFalsy();
+	describe('_elementsEqual', function() {
+		it('should return true if arrays are the same', function() {
+			expect(helpers._elementsEqual(
+				[{datasetIndex: 0, index: 1}, {datasetIndex: 0, index: 2}],
+				[{datasetIndex: 0, index: 1}, {datasetIndex: 0, index: 2}])).toBeTruthy();
 		});
 		it('should return false if arrays are not the same', function() {
-			var o0 = {};
-			var o1 = {};
-			var o2 = {};
-
-			expect(helpers.arrayEquals([], [])).toBeTruthy();
-			expect(helpers.arrayEquals([1, 2, 3], [1, 2, 3])).toBeTruthy();
-			expect(helpers.arrayEquals(['foo', 'bar'], ['foo', 'bar'])).toBeTruthy();
-			expect(helpers.arrayEquals([true, false, true], [true, false, true])).toBeTruthy();
-			expect(helpers.arrayEquals([o0, o1, o2], [o0, o1, o2])).toBeTruthy();
+			expect(helpers._elementsEqual([], [{datasetIndex: 0, index: 1}])).toBeFalsy();
+			expect(helpers._elementsEqual([{datasetIndex: 0, index: 2}], [{datasetIndex: 0, index: 1}])).toBeFalsy();
 		});
 	});
 
@@ -304,6 +272,11 @@ describe('Chart.helpers.core', function() {
 	});
 
 	describe('merge', function() {
+		it('should not allow prototype pollution', function() {
+			var test = helpers.merge({}, JSON.parse('{"__proto__":{"polluted": true}}'));
+			expect(test.prototype).toBeUndefined();
+			expect(Object.prototype.polluted).toBeUndefined();
+		});
 		it('should update target and return it', function() {
 			var target = {a: 1};
 			var result = helpers.merge(target, {a: 2, b: 'foo'});
@@ -351,6 +324,11 @@ describe('Chart.helpers.core', function() {
 	});
 
 	describe('mergeIf', function() {
+		it('should not allow prototype pollution', function() {
+			var test = helpers.mergeIf({}, JSON.parse('{"__proto__":{"polluted": true}}'));
+			expect(test.prototype).toBeUndefined();
+			expect(Object.prototype.polluted).toBeUndefined();
+		});
 		it('should update target and return it', function() {
 			var target = {a: 1};
 			var result = helpers.mergeIf(target, {a: 2, b: 'foo'});
@@ -397,56 +375,86 @@ describe('Chart.helpers.core', function() {
 		});
 	});
 
-	describe('extend', function() {
-		it('should merge object properties in target and return target', function() {
-			var target = {a: 'abc', b: 56};
-			var object = {b: 0, c: [2, 5, 6]};
-			var result = helpers.extend(target, object);
-
-			expect(result).toBe(target);
-			expect(target).toEqual({a: 'abc', b: 0, c: [2, 5, 6]});
+	describe('resolveObjectKey', function() {
+		it('should resolve empty key to root object', function() {
+			const obj = {test: true};
+			expect(helpers.resolveObjectKey(obj, '')).toEqual(obj);
 		});
-		it('should merge multiple objects properties in target', function() {
-			var target = {a: 0, b: 1};
-			var o0 = {a: 2, c: 3, d: 4};
-			var o1 = {a: 5, c: 6};
-			var o2 = {a: 7, e: 8};
-
-			helpers.extend(target, o0, o1, o2);
-
-			expect(target).toEqual({a: 7, b: 1, c: 6, d: 4, e: 8});
-		});
-		it('should not deeply merge object properties in target', function() {
-			var target = {a: {b: 0, c: 1}};
-			var object = {a: {b: 2, d: 3}};
-
-			helpers.extend(target, object);
-
-			expect(target).toEqual({a: {b: 2, d: 3}});
-			expect(target.a).toBe(object.a);
-		});
-	});
-
-	describe('inherits', function() {
-		it('should return a derived class', function() {
-			var A = function() {};
-			A.prototype.p0 = 41;
-			A.prototype.p1 = function() {
-				return '42';
+		it('should resolve one level', function() {
+			const obj = {
+				bool: true,
+				str: 'test',
+				int: 42,
+				obj: {name: 'object'}
 			};
-
-			A.inherits = helpers.inherits;
-			var B = A.inherits({p0: 43, p2: [44]});
-			var C = A.inherits({p3: 45, p4: [46]});
-			var b = new B();
-
-			expect(b instanceof A).toBeTruthy();
-			expect(b instanceof B).toBeTruthy();
-			expect(b instanceof C).toBeFalsy();
-
-			expect(b.p0).toBe(43);
-			expect(b.p1()).toBe('42');
-			expect(b.p2).toEqual([44]);
+			expect(helpers.resolveObjectKey(obj, 'bool')).toEqual(true);
+			expect(helpers.resolveObjectKey(obj, 'str')).toEqual('test');
+			expect(helpers.resolveObjectKey(obj, 'int')).toEqual(42);
+			expect(helpers.resolveObjectKey(obj, 'obj')).toEqual(obj.obj);
+		});
+		it('should resolve multiple levels', function() {
+			const obj = {
+				child: {
+					level: 1,
+					child: {
+						level: 2,
+						child: {
+							level: 3
+						}
+					}
+				}
+			};
+			expect(helpers.resolveObjectKey(obj, 'child.level')).toEqual(1);
+			expect(helpers.resolveObjectKey(obj, 'child.child.level')).toEqual(2);
+			expect(helpers.resolveObjectKey(obj, 'child.child.child.level')).toEqual(3);
+		});
+		it('should resolve circular reference', function() {
+			const root = {};
+			const child = {root};
+			child.child = child;
+			root.child = child;
+			expect(helpers.resolveObjectKey(root, 'child')).toEqual(child);
+			expect(helpers.resolveObjectKey(root, 'child.child.child.child.child.child')).toEqual(child);
+			expect(helpers.resolveObjectKey(root, 'child.child.root')).toEqual(root);
+		});
+		it('should break at empty key', function() {
+			const obj = {
+				child: {
+					level: 1,
+					child: {
+						level: 2,
+						child: {
+							level: 3
+						}
+					}
+				}
+			};
+			expect(helpers.resolveObjectKey(obj, 'child..level')).toEqual(obj.child);
+			expect(helpers.resolveObjectKey(obj, 'child.child.level...')).toEqual(2);
+			expect(helpers.resolveObjectKey(obj, '.')).toEqual(obj);
+			expect(helpers.resolveObjectKey(obj, '..')).toEqual(obj);
+		});
+		it('should resolve undefined', function() {
+			const obj = {
+				child: {
+					level: 1,
+					child: {
+						level: 2,
+						child: {
+							level: 3
+						}
+					}
+				}
+			};
+			expect(helpers.resolveObjectKey(obj, 'level')).toEqual(undefined);
+			expect(helpers.resolveObjectKey(obj, 'child.level.a')).toEqual(undefined);
+		});
+		it('should throw on invalid input', function() {
+			expect(() => helpers.resolveObjectKey(undefined, undefined)).toThrow();
+			expect(() => helpers.resolveObjectKey({}, null)).toThrow();
+			expect(() => helpers.resolveObjectKey({}, false)).toThrow();
+			expect(() => helpers.resolveObjectKey({}, true)).toThrow();
+			expect(() => helpers.resolveObjectKey({}, 1)).toThrow();
 		});
 	});
 });

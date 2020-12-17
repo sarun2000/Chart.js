@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Scriptable > Polar Area | Chart.js sample</title>
 	<link rel="stylesheet" type="text/css" href="../style.css">
-	<script src="../../dist/Chart.min.js"></script>
+	<script src="../../dist/chart.min.js"></script>
 	<script src="../utils.js"></script>
 </head>
 <body>
@@ -56,8 +56,10 @@
 		};
 
 		var options = {
-			legend: false,
-			tooltips: false,
+			plugins: {
+				legend: false,
+				tooltip: false,
+			},
 			elements: {
 				arc: {
 					backgroundColor: colorize.bind(null, false, false),

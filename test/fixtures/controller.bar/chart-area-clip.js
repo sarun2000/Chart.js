@@ -11,8 +11,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			layout: {
 				padding: {
 					left: 0,
@@ -22,14 +20,14 @@ module.exports = {
 				}
 			},
 			elements: {
-				rectangle: {
+				bar: {
 					backgroundColor: '#00ff00',
 					borderWidth: 8
 				}
 			},
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [{display: false, ticks: {min: -10, max: 10}}]
+				x: {display: false},
+				y: {display: false, min: -10, max: 10}
 			}
 		}
 	},

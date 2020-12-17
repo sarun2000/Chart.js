@@ -3,7 +3,7 @@
 
 <head>
 	<title>Doughnut Chart</title>
-	<script src="../../dist/Chart.min.js"></script>
+	<script src="../../dist/chart.min.js"></script>
 	<script src="../utils.js"></script>
 	<style>
 	canvas {
@@ -59,12 +59,14 @@
 			},
 			options: {
 				responsive: true,
-				legend: {
-					position: 'top',
-				},
-				title: {
-					display: true,
-					text: 'Chart.js Doughnut Chart'
+				plugins: {
+					legend: {
+						position: 'top',
+					},
+					title: {
+						display: true,
+						text: 'Chart.js Doughnut Chart'
+					},
 				},
 				animation: {
 					animateScale: true,

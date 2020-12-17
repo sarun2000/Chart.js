@@ -21,8 +21,6 @@ module.exports = {
 			]
 		},
 		options: {
-			legend: false,
-			title: false,
 			elements: {
 				line: {
 					borderCapStyle: 'butt',
@@ -39,9 +37,7 @@ module.exports = {
 			},
 			scale: {
 				display: false,
-				ticks: {
-					beginAtZero: true
-				}
+				beginAtZero: true
 			}
 		}
 	},

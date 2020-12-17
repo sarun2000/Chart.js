@@ -17,11 +17,9 @@ module.exports = {
 			}]
 		},
 		options: {
-			legend: false,
-			title: false,
 			scales: {
-				xAxes: [{display: false}],
-				yAxes: [{display: false}]
+				x: {display: false},
+				y: {display: false}
 			},
 			elements: {
 				point: {
